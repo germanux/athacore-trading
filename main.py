@@ -1,16 +1,19 @@
 from nicegui import ui
-import subprocess
-import os
 
 import plotly.graph_objects as go #Version simple
 import yfinance as yf
 import pandas as pd
+
+from athacore.analisis import principal_analisis
+from athacore.decisiones import principal_decisiones
+from athacore.ejecucion import principal_ejecucion
 
 ESTRATEGIAS = ["estrategia_basica_medias"]
 MODOS_EJECUCION = ["simulacion", "real"]
 
 ACTIVOS=["AAPL"]
 METODOS_GRAFICAS = ["Simple", "Comparación", "Anual", "Diferecial"]
+
 """
 Gráfica mes a mes total de un activo
 Gráfica que compare la evolución de dos activos
@@ -19,25 +22,16 @@ Grafica que muestre cuánto creció /decreció (es decir, la diferencia) un acti
 """
 
 def ejecutar_analisis(estrategia: str, ticker: str, inicio: str, fin: str):
-    os.environ['ESTRATEGIA'] = estrategia
-    os.environ['TICKER'] = ticker
-    os.environ['FECHA_INICIO'] = inicio
-    os.environ['FECHA_FIN'] = fin
-    subprocess.Popen(["python", "-m", "athacore.analisis.principal_analisis"])
+    principal_analisis.ejecutar_analisis(estrategia, ticker, inicio, fin)
     ui.notify("✅ Análisis lanzado")
 
 def evaluar_ahora(estrategia: str, ticker: str):
-    os.environ['ESTRATEGIA'] = estrategia
-    os.environ['TICKER'] = ticker
-    os.environ['MODO_OPERACION'] = "test"
-    subprocess.Popen(["python", "-m", "athacore.decisiones.principal_decisiones"])
+    modo = "test"
+    principal_decisiones.ejecutar_decision(estrategia, ticker, modo)
     ui.notify("✅ Evaluación lanzada (modo test)")
 
 def ejecutar_estrategia(estrategia: str, ticker: str, modo: str):
-    os.environ['ESTRATEGIA'] = estrategia
-    os.environ['TICKER'] = ticker
-    os.environ['MODO_OPERACION'] = modo
-    subprocess.Popen(["python", "-m", "athacore.decisiones.principal_decisiones"])
+    principal_decisiones.ejecutar_decision(estrategia, ticker, modo)
     ui.notify(f"✅ Estrategia lanzada en modo '{modo}'")
 
 

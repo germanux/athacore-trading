@@ -1,14 +1,9 @@
-import os
 from athacore.analisis.datos.fuente_datos import obtener_datos
 from athacore.decisiones.estrategias.estrategia_basica_medias import estrategia_basica_medias
-from athacore.ejecucion.principal_ejecucion import ejecutar_orden_simulada, ejecutar_orden_real_ibkr
+from athacore.ejecucion import principal_ejecucion
 
 
-def ejecutar_decision():
-    estrategia = os.getenv("ESTRATEGIA", "estrategia_basica_medias")
-    ticker = os.getenv("TICKER", "AAPL")
-    modo = os.getenv("MODO_OPERACION", "test")
-
+def ejecutar_decision(estrategia, ticker, modo):
     print(f"🧠 MODO: {modo.upper()} — Estrategia: {estrategia} — Ticker: {ticker}")
 
     df = obtener_datos(ticker, "2023-01-01", "2023-12-31")
@@ -27,12 +22,10 @@ def ejecutar_decision():
         for fecha, señal in señales:
             print(f"{fecha.date()} → {señal}")
     elif modo in ["simulacion", "real"]:
+        print(f"🚀 Modo de ejecución: {modo.upper()}")
         for fecha, señal in señales:
             print(f"{fecha.date()} → {señal}")
-            if modo == "simulacion":
-                ejecutar_orden_simulada(señal, ticker)
-            elif modo == "real":
-                ejecutar_orden_real_ibkr(señal, ticker)
+            principal_ejecucion.ejecutar_desde_estrategia(señal, ticker, modo)
     else:
         print(f"❌ Modo desconocido: {modo}")
 

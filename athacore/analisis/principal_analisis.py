@@ -1,14 +1,8 @@
-import os
 from athacore.analisis.datos.fuente_datos import obtener_datos
 from athacore.decisiones.estrategias.estrategia_basica_medias import estrategia_basica_medias
 
 
-def ejecutar_analisis():
-    estrategia = os.getenv("ESTRATEGIA", "estrategia_basica_medias")
-    ticker = os.getenv("TICKER", "AAPL")
-    inicio = os.getenv("FECHA_INICIO", "2023-01-01")
-    fin = os.getenv("FECHA_FIN", "2023-12-31")
-
+def ejecutar_analisis(estrategia, ticker, inicio, fin):
     print(f"📊 ANALISIS — Estrategia: {estrategia} — Ticker: {ticker} — Periodo: {inicio} a {fin}")
 
     df = obtener_datos(ticker, inicio, fin)
