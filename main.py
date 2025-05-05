@@ -1,12 +1,16 @@
 from nicegui import ui
 
-import plotly.graph_objects as go #Version simple
+#Libreias que se deberían quitar tras la modularización
+import plotly.graph_objects as go
 import yfinance as yf
 import pandas as pd
 
 from athacore.analisis import principal_analisis
 from athacore.decisiones import principal_decisiones
 from athacore.ejecucion import principal_ejecucion
+
+#Modularaización de gráficas
+from data_view.graficas_isabel import grafica_simple
 
 ESTRATEGIAS = ["estrategia_basica_medias"]
 MODOS_EJECUCION = ["simulacion", "real"]
@@ -61,99 +65,19 @@ with ui.card().classes("w-1/2 mt-6"):
     ui.button("▶️ Ejecutar", on_click=lambda: ejecutar_estrategia(estrategia_3.value, ticker_3.value, modo_3.value))
 
 
-
-    """
-    
-    def actualizar_inputs(event):
-        if event.value == "Simple":
-            fecha_1 = ui.date("Fecha inicio")
-            fecha_2 = ui.date("Fecha inicio")
-        elif event.value == "Comparación":
-            pass
-        elif event.value == "Anual":
-            pass
-        elif event.value == "Diferecial":
-            pass
-    fecha_1 = ui.date("Fecha inicio")
-    metodo_grafica_selecionada.on_value_change(actualizar_inputs)
-    """
-
 with ui.card().classes("w-full mt-6"):
-    ui.label("Gráficas")
-    metodo_grafica_selecionada = ui.select(METODOS_GRAFICAS, value=METODOS_GRAFICAS[0])
-    lista_inputs = ui.row()
-    contenedor_graficas = ui.row()
+    ui.label("📊 Gráfica simple")
+    activo_selecionado = ui.select(ACTIVOS, value=ACTIVOS[0])
+    lista_inputs_simple = ui.row()
+    with lista_inputs_simple:
+        fecha_1 = ui.date("Fecha desde la que quieres empezar el seguimiento")
+    contenedor_grafica_simple = ui.row()
 
-    # Mostrar número de inputs según el tipo de grafica que se quiera
-    def actualizar_inputs(event):
-        lista_inputs.clear()
-    
-        if event.value.strip() == "Simple":
-            with lista_inputs:
-                fecha_1 = ui.date("Fecha desde la que quieres empezar el seguimiento")
-            activo_selecionado = ui.select(ACTIVOS, value=ACTIVOS[0])
-            ui.button("Generar gráfica", on_click=lambda: grafica_simple(fecha_1.value, activo_selecionado.value))
-        elif event.value == "Comparación":
-            pass
-        elif event.value == "Anual":
-            pass
-        elif event.value == "Diferecial":
-            pass
-    actualizar_inputs(metodo_grafica_selecionada)
-    metodo_grafica_selecionada.on_value_change(actualizar_inputs)
+    def dibujar_grafica_simple():
+        contenedor_grafica_simple.clear()
+        with contenedor_grafica_simple:
+            grafica_simple(fecha_1.value, activo_selecionado.value)
 
-    """
-    GRAFICA SIMPLE DE EJEMPLO
-    def primeraGrafica():
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=["2023-01-01", "2024-01-01", "2025-01-01", "2026-01-01"],
-            y=[45, -12, 120, 71]
-        ))
-        ui.plotly(fig).classes("w-full h-100")
-    primeraGrafica()
-    """
-    
-    def grafica_simple(fecha_inicio:str, activo:str):
-        print(f"Datos pasados a la gráfica:\n- Fecha de inicio: {fecha_inicio}\n- Activo: {activo}")
-
-        fecha_final = "2025-4-1" #Se podria implementar la libreria de datetime para poner la fecha actual
-        
-        # TOMAR DATOS
-        data = yf.download(activo, fecha_inicio, fecha_final)
-        data = data.reset_index()
-
-        # Limpiar multinivel
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = data.columns.get_level_values(0)
-
-        #Limpiar gráfica anterior
-        contenedor_graficas.clear()
-
-        # CREAR GRÁFICA
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x = data["Date"],
-            y = data["Volume"],
-        ))
-        
-        fig.update_layout(
-            title=f"Volumen de {activo} entre {fecha_inicio} y {fecha_final}",
-            xaxis_title="Fecha",
-            yaxis_title="Volumen",
-            xaxis=dict(
-                tickformat="%Y-%m-%d",
-                type="date"
-            )
-        )
-        
-        with contenedor_graficas:
-            ui.plotly(fig).classes("w-full h-200")
-        
-        #Prints que he usado para comprobar datos
-        print(data)
-        print(data["Date"])
-        print(data["Volume"])
-        print(data.columns)
+    ui.button("Generar gráfica", on_click=lambda: dibujar_grafica_simple())
 
 ui.run(title="Panel de Trading Algorítmico")
