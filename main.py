@@ -1,83 +1,38 @@
 from nicegui import ui
 
-#Libreias que se deberían quitar tras la modularización
-import plotly.graph_objects as go
-import yfinance as yf
-import pandas as pd
+# Importaciones de las vistas (pestañas)
+from athacore.gui.tabs.dashboard import render_dashboard
+from athacore.gui.tabs.data_view import render_data_view
+from athacore.gui.tabs.graphics_view import render_graphics_view
+from athacore.gui.tabs.strategy_view import render_strategy_view
+from athacore.gui.tabs.execution_view import render_execution_view
+from athacore.gui.tabs.backtesting_view import render_backtesting_view
+from athacore.gui.tabs.logs_view import render_logs_view
+from athacore.gui.tabs.settings_view import render_settings_view
 
-from athacore.analisis import principal_analisis
-from athacore.decisiones import principal_decisiones
-from athacore.ejecucion import principal_ejecucion
+# Configuración de pestañas
+tabs_config = [
+    ('Dashboard', render_dashboard),
+    ('Datos de mercado', render_data_view),
+    ('Gráficas', render_graphics_view),
+    ('Estrategias', render_strategy_view),
+    ('Ejecución', render_execution_view),
+    ('Backtesting', render_backtesting_view),
+    ('Logs', render_logs_view),
+    ('Configuración', render_settings_view),
+]
 
-#Modularaización de gráficas
-from data_view.graficas_isabel import grafica_simple
+# Crear las pestañas en la interfaz
+with ui.tabs().classes('w-full') as tabs:
+    tab_headers = [ui.tab(nombre) for nombre, _ in tabs_config]
 
-ESTRATEGIAS = ["estrategia_basica_medias"]
-MODOS_EJECUCION = ["simulacion", "real"]
+with ui.tab_panels(tabs, value=tab_headers[0]).classes('w-full'):
+    for (nombre, render_func), tab in zip(tabs_config, tab_headers):
+        with ui.tab_panel(tab):
+            try:
+                render_func()
+            except Exception as e:
+                ui.label(f"⚠️ Error al cargar la pestaña '{nombre}': {e}")
 
-ACTIVOS=["AAPL"]
-METODOS_GRAFICAS = ["Simple", "Comparación", "Anual", "Diferecial"]
-
-"""
-Gráfica mes a mes total de un activo
-Gráfica que compare la evolución de dos activos
-Gráfica que muestre un año concreto
-Grafica que muestre cuánto creció /decreció (es decir, la diferencia) un activo en un periodo
-"""
-
-def ejecutar_analisis(estrategia: str, ticker: str, inicio: str, fin: str):
-    principal_analisis.ejecutar_analisis(estrategia, ticker, inicio, fin)
-    ui.notify("✅ Análisis lanzado")
-
-def evaluar_ahora(estrategia: str, ticker: str):
-    modo = "test"
-    principal_decisiones.ejecutar_decision(estrategia, ticker, modo)
-    ui.notify("✅ Evaluación lanzada (modo test)")
-
-def ejecutar_estrategia(estrategia: str, ticker: str, modo: str):
-    principal_decisiones.ejecutar_decision(estrategia, ticker, modo)
-    ui.notify(f"✅ Estrategia lanzada en modo '{modo}'")
-
-
-# INICIO DE LA INTERFAZ
-
-ui.label("🧠 Panel de control de trading algorítmico").classes("text-2xl mb-4")
-
-with ui.card().classes("w-1/2"):
-    ui.label("📊 Análisis de estrategia (histórico)")
-    estrategia_1 = ui.select(ESTRATEGIAS, value=ESTRATEGIAS[0])
-    ticker_1 = ui.input("Ticker", value="AAPL")
-    inicio = ui.input("Fecha inicio (YYYY-MM-DD)", value="2023-01-01")
-    fin = ui.input("Fecha fin (YYYY-MM-DD)", value="2023-12-31")
-    ui.button("▶️ Analizar", on_click=lambda: ejecutar_analisis(estrategia_1.value, ticker_1.value, inicio.value, fin.value))
-
-with ui.card().classes("w-1/2 mt-6"):
-    ui.label("🧪 Evaluar ahora (modo test, no ejecuta)")
-    estrategia_2 = ui.select(ESTRATEGIAS, value=ESTRATEGIAS[0])
-    ticker_2 = ui.input("Ticker", value="AAPL")
-    ui.button("▶️ Evaluar", on_click=lambda: evaluar_ahora(estrategia_2.value, ticker_2.value))
-
-with ui.card().classes("w-1/2 mt-6"):
-    ui.label("⚙️ Ejecutar estrategia (simulación o real)")
-    estrategia_3 = ui.select(ESTRATEGIAS, value=ESTRATEGIAS[0])
-    ticker_3 = ui.input("Ticker", value="AAPL")
-    modo_3 = ui.select(MODOS_EJECUCION, value=MODOS_EJECUCION[0])
-    ui.button("▶️ Ejecutar", on_click=lambda: ejecutar_estrategia(estrategia_3.value, ticker_3.value, modo_3.value))
-
-
-with ui.card().classes("w-full mt-6"):
-    ui.label("📊 Gráfica simple")
-    activo_selecionado = ui.select(ACTIVOS, value=ACTIVOS[0])
-    lista_inputs_simple = ui.row()
-    with lista_inputs_simple:
-        fecha_1 = ui.date("Fecha desde la que quieres empezar el seguimiento")
-    contenedor_grafica_simple = ui.row()
-
-    def dibujar_grafica_simple():
-        contenedor_grafica_simple.clear()
-        with contenedor_grafica_simple:
-            grafica_simple(fecha_1.value, activo_selecionado.value)
-
-    ui.button("Generar gráfica", on_click=lambda: dibujar_grafica_simple())
-
-ui.run(title="Panel de Trading Algorítmico")
+# Lanzar la app
+ui.run()
