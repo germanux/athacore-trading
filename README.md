@@ -1,131 +1,108 @@
-# 📈 ATHACORE – Plataforma modular de trading algorítmico
+# Athacore Trading Project
 
-Sistema estructurado por módulos para backtesting, decisión y ejecución de operaciones.
-
----
-
-## 🚀 Requisitos iniciales
-
-1. Python 3.10+
-2. Crear y activar entorno virtual:
-
-```bash
-# Linux / Mac
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Windows
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-3. Instalar dependencias:
-
-```bash
-pip install -r requirements.txt
-```
-
-4. Ejecutar entorno (modo simplificado):
-
-```bash
-# Windows
-setup.bat
-
-# Linux / Mac
-./setup.sh
-```
+Proyecto modular de sistema de trading algorítmico desarrollado en Python con NiceGUI para interfaz gráfica.
 
 ---
 
-## 🧠 ¿Qué hace cada módulo?
+## 📁 Estructura del proyecto
 
-| Módulo           | Ruta                              | Función principal                                |
-|------------------|-----------------------------------|--------------------------------------------------|
-| Análisis         | `athacore/analisis/`              | Simulación y métricas sobre históricos          |
-| Decisiones       | `athacore/decisiones/`            | Motor de estrategias (reglas, IA, señales)      |
-| Ejecución        | `athacore/ejecucion/`             | Ejecuta órdenes reales o en modo demo           |
-| Interfaz gráfica | `main.py`                         | UI web con NiceGUI para controlar todo          |
+```
+athacore-trading/
+├── core/
+│   ├── data/
+│   │   └── market_data.py          # Obtención de datos de mercado (yfinance)
+│   ├── strategy/
+│   │   └── strategy_engine.py      # Motor de estrategias (generar señales, ejecutar análisis)
+│   ├── execution/
+│   │   └── order_executor.py       # Ejecución de órdenes simuladas o reales
+│   ├── backtesting/
+│   │   └── backtester.py           # Módulo de backtesting sobre señales generadas
+│   ├── indicators/
+│   │   └── indicators.py           # Indicadores técnicos (SMA, EMA, RSI, MACD)
+│   └── graphics/
+│       ├── charts/
+│       │   └── volume_chart.py     # Generación de gráfica de volumen
+│
+├── gui/
+│   └── tabs/
+│       ├── dashboard.py            # Pestaña de resumen general
+│       ├── data_view.py             # Pestaña de datos de mercado
+│       ├── graphics_view.py         # Pestaña de generación de gráficas
+│       ├── strategy_view.py         # Pestaña de estrategias de trading
+│       ├── execution_view.py        # Pestaña de ejecución de órdenes
+│       ├── backtesting_view.py      # Pestaña de backtesting de estrategias
+│       ├── logs_view.py             # Pestaña de logs del sistema
+│       └── settings_view.py         # Pestaña de configuración
+│
+├── main.py                          # Punto de entrada principal de la aplicación
+└── README.md                        # Documentación principal del proyecto
+```
 
 ---
 
-## 💻 Uso general (con interfaz web)
+## 📄 Descripción de los módulos principales
 
-Lanza la app con NiceGUI:
+### `core/data/market_data.py`
+- Descarga datos históricos de mercado (acciones) usando `yfinance`.
+- Devuelve un `DataFrame` limpio y listo para usar en estrategias o gráficas.
+
+### `core/strategy/strategy_engine.py`
+- Contiene la definición de estrategias de trading (medias móviles, RSI, MACD).
+- Función `run_analysis()` orquesta la ejecución de estrategias sobre datos.
+
+### `core/execution/order_executor.py`
+- Permite ejecutar órdenes de compra/venta.
+- Funciona en modo de simulación o modo real (preparado para integración con Interactive Brokers).
+
+### `core/backtesting/backtester.py`
+- Realiza backtesting de estrategias usando datos históricos.
+- Calcula resultados financieros básicos: beneficio neto, número de operaciones.
+
+### `core/indicators/indicators.py`
+- Implementa indicadores técnicos como SMA, EMA, RSI y MACD.
+- Funciones reutilizables para estrategias y análisis.
+
+### `core/graphics/`
+- `charts/volume_chart.py`: generación de gráficas de volumen de activos con `plotly`.
+- En el futuro incluirá comparativas, gráficas anuales, diferenciales, etc.
+
+---
+
+## 📄 Descripción de las pestañas (`gui/tabs/`)
+
+- **Dashboard**: Resumen general del sistema.
+- **Datos de mercado**: Consulta interactiva de datos históricos.
+- **Gráficas**: Creación y visualización de gráficas financieras.
+- **Estrategias**: Configuración y ejecución de estrategias de trading.
+- **Ejecución**: Panel de ejecución de órdenes en simulación o real.
+- **Backtesting**: Evaluación de estrategias en histórico.
+- **Logs**: Registro de eventos y acciones del sistema.
+- **Configuración**: Personalización y ajustes del sistema.
+
+---
+
+## 🚀 Cómo arrancar el proyecto
+
+1. Instalar dependencias:
+
+```bash
+pip install nicegui yfinance plotly pandas ib_insync
+```
+
+2. Ejecutar la aplicación:
 
 ```bash
 python main.py
 ```
 
-Luego abre tu navegador en: [http://localhost:8080](http://localhost:8080)
-
-Ahí podrás:
-- Elegir una estrategia (ej: cruce de medias)
-- Seleccionar modo: `simulación`, `real` o `test`
-- Ver notificaciones del sistema
-
 ---
 
-## ⚙️ Variables opcionales por entorno (modo simulación)
+## ✅ Buenas prácticas para continuar
 
-Puedes configurar variables de entorno para ajustar los datos:
-
-```bash
-set ESTRATEGIA=estrategia_basica_medias
-set TICKER=AAPL
-set FECHA_INICIO=2023-01-01
-set FECHA_FIN=2023-12-31
-```
+- Mantener separación clara entre lógica de datos (`core/data`), estrategias (`core/strategy`), ejecución (`core/execution`) y presentación (`gui/`).
+- Añadir nuevas estrategias registrándolas en `strategy_engine.py`.
+- Añadir nuevas gráficas creando módulos en `core/graphics/charts/`.
+- Documentar cualquier nueva función o módulo.
+- Crear `__init__.py` en cada carpeta para garantizar correcto funcionamiento de imports.
 
 ---
-
-## 📁 Estructura recomendada
-
-```
-/athacore/
-├── analisis/              # Módulo Athalyzer (backtesting)
-├── decisiones/            # Módulo Athavest (estrategias)
-├── ejecucion/             # Módulo Tradergon (broker/demo)
-├── interfaz/              # NiceGUI (opcional si main.py crece mucho)
-├── config/                # Parámetros y entorno
-├── logs/                  # Logs de operaciones y errores
-├── pruebas/               # Tests técnicos
-
-main.py                   # Punto de entrada global (UI)
-requirements.txt          # Librerías necesarias
-README.md                 # Este documento
-.gitignore                # Exclusiones para Git
-setup.sh                  # Script Linux/Mac para entorno
-setup.bat                 # Script Windows para entorno
-verificacion.md           # ✅ Checklist de pruebas del sistema
-```
-
----
-
-## ✅ Estado actual
-
-- [x] Interfaz web básica lista
-- [x] Estrategia simple funcional (cruce de medias)
-- [x] Descarga de datos históricos con yfinance
-- [ ] Conexión a broker real (IBKR)
-- [ ] Sistema completo de métricas y visualización
-
----
-
-## 🔧 Verificación del sistema
-
-Puedes usar el documento `verificacion.md` para comprobar paso a paso que todo está correctamente montado:
-
-```bash
-start verificacion.md   # En Windows
-# o
-open verificacion.md    # En Mac
-# o
-xdg-open verificacion.md  # En Linux
-```
-
----
-
-## 👨‍💼 Autor / Contacto
-
-> Proyecto educativo y experimental  
-> Versión inicial modularizada 2025
