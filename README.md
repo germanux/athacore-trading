@@ -81,6 +81,40 @@ athacore-trading/
 
 ---
 
+## 📄 Esquema de flujo entre pestañas (`gui/tabs/`)
+
+[ Dashboard ]
+      ↓
+[ Datos de mercado ]
+      ↓
+[ Gráficas ] ←
+      ↓       ↘
+[ Estrategias ] → (Genera señales) → [ Ejecución (Simulada/Real) ]
+      ↓
+[ Backtesting ] → (Evalúa históricamente rendimiento)
+      ↓
+[ Logs ]
+      ↓
+[ Configuración ]
+
+---
+
+## 🧠 Interpretación del flujo:
+
+El usuario consulta datos y genera gráficas para inspirarse o analizar.
+
+Ejecuta estrategias para generar señales inmediatas.
+
+Si quiere actuar → Ejecuta órdenes reales o simuladas desde Ejecución.
+
+Antes o después puede hacer Backtesting para analizar estadísticamente la calidad de esas estrategias.
+
+Logs registra todo lo que ocurre.
+
+Configuración permite ajustar parámetros del sistema.
+
+---
+
 ## 🚀 Cómo arrancar el proyecto
 
 1. Instalar dependencias:
