@@ -46,12 +46,14 @@ def estrategia_macd_cruce(df: pd.DataFrame) -> list:
 
 
 # Registro centralizado de estrategias
-estrategias_disponibles = {
-    "estrategia_basica_medias": estrategia_basica_medias,
-    "estrategia_rsi_simple": estrategia_rsi_simple,
-    "estrategia_macd_cruce": estrategia_macd_cruce,
-    "default": estrategia_basica_medias,
-}
+
+def mostrar_estrategias() -> dict:
+    return {
+        "estrategia_basica_medias": estrategia_basica_medias,
+        "estrategia_rsi_simple": estrategia_rsi_simple,
+        "estrategia_macd_cruce": estrategia_macd_cruce,
+        "default": estrategia_basica_medias,
+    }
 
 
 def run_analysis(strategy_name: str, ticker: str, start: str, end: str) -> list:
@@ -62,7 +64,8 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str) -> list:
     if df.empty:
         raise ValueError("No se pudieron obtener datos.")
 
-    estrategia_fn = estrategias_disponibles.get(strategy_name)
+    estrategia_fn = mostrar_estrategias().get(strategy_name)
+
     if not estrategia_fn:
         raise NotImplementedError(f"Estrategia no implementada: {strategy_name}")
 

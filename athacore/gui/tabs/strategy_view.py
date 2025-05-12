@@ -1,12 +1,13 @@
 from nicegui import ui
-from athacore.core.strategy.strategy_engine import run_analysis
+from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_analysis
 
 
 def render_strategy_view():
     with ui.column().classes('p-4'):
         ui.label('🧠 Estrategias de Trading')
 
-        ESTRATEGIAS=['estrategia_basica_medias', 'estrategia_rsi_simple', 'estrategia_macd_cruce']
+        ESTRATEGIAS = list(mostrar_estrategias().keys())
+
         estrategia = ui.select(
             options=ESTRATEGIAS,
             label='Selecciona estrategia',
