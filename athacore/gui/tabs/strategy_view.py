@@ -3,20 +3,23 @@ from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_anal
 
 
 def render_strategy_view():
-    with ui.column().classes('p-4'):
+    with ui.card().classes('p-4 w-full'):
         ui.label('🧠 Estrategias de Trading')
 
         ESTRATEGIAS = list(mostrar_estrategias().keys())
 
-        estrategia = ui.select(
-            options=ESTRATEGIAS,
-            label='Selecciona estrategia',
-            value=ESTRATEGIAS[0]
-        )
-        ticker = ui.input('Ticker (ej: AAPL)').props('outlined')
-        start = ui.input('Fecha inicio (YYYY-MM-DD)').props('outlined')
-        end = ui.input('Fecha fin (YYYY-MM-DD)').props('outlined')
-        output = ui.column()
+        with ui.row().classes("w-full gap-0"):
+            inputs = ui.column().classes("w-1/3")
+            with inputs:
+                estrategia = ui.select(
+                    options=ESTRATEGIAS,
+                    label='Selecciona estrategia',
+                    value=ESTRATEGIAS[0]
+                )
+                ticker = ui.input('Ticker (ej: AAPL)').props('outlined')
+                start = ui.input('Fecha inicio (YYYY-MM-DD)').props('outlined')
+                end = ui.input('Fecha fin (YYYY-MM-DD)').props('outlined')
+            output = ui.column().classes("w-2/3")
 
         def ejecutar():
             try:
@@ -27,16 +30,20 @@ def render_strategy_view():
                     end=end.value
                 )
                 
+                output.clear()
                 with output:
                     ui.label(f'Se generaron {len(señales)} señales:\n').classes("font-bold")
                     ui.table(
+                        title = "Listado de señales",
                         columns = [
                             {'name': 'indice', 'label': 'Índice', 'field': 'indice', 'align': 'center'},
                             {'name': 'fecha', 'label': 'Fecha', 'field': 'fecha', 'align': 'left'},
                             {'name': 'accion', 'label': 'Acción', 'field': 'accion', 'align': 'left'}],
-                        rows = [{"indice": index, "fecha": fecha.date(), "accion": accion} for index, fecha, accion in señales])
+                        rows = [{"indice": index, "fecha": fecha.date(), "accion": accion} for index, fecha, accion in señales],
+                        pagination={'rowsPerPage': 10})
                     
             except Exception as e:
                 output.set_text(f'Error: {e}')
 
-        ui.button('Ejecutar estrategia', on_click=ejecutar)
+        with inputs:
+            ui.button('Ejecutar estrategia', on_click=ejecutar)
