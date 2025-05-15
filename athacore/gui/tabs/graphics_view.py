@@ -1,11 +1,13 @@
 from nicegui import ui
-from datetime import date
+from datetime import date, datetime
 from athacore.core.data.market_data import get_price_data
 from athacore.core.graphics.charts.volume_chart import build_volume_chart
 from athacore.core.graphics.charts.comparison_chart import build_volume_comparison_chart_multiple
+from athacore.core.graphics.charts.anual_chart import build_annual_candlestick
+import plotly.graph_objects as go
 
 ACTIVOS = ['AAPL', 'GOOGL', 'MSFT']
-TIPOS_GRAFICAS = ['Volumen', 'Comparar Volumen']
+TIPOS_GRAFICAS = ['Volumen', 'Comparar Volumen', 'Anual']
 
 def render_graphics_view():
     with ui.card().classes("w-full mt-6"):
@@ -16,10 +18,18 @@ def render_graphics_view():
             with ui.column().classes("w-1/3"):
                 lista_inputs = ui.column().classes("mt-4")
                 boton_generar = ui.row().classes("mt-2")
-            contenedor_graficas = ui.column().classes("mt-6 w-2/3")  # Aquí se apilan las gráficas generadas
+            contenedor_graficas = ui.column().classes("mt-6 w-2/3")  # Aquí se apilan las gráficas generadas 
 
         # Lista para almacenar las gráficas generadas
         graficas_generadas = []
+
+        def actualizar_contenedor_graficas():
+            contenedor_graficas.clear()
+            for titulo, grafico in graficas_generadas:
+                with contenedor_graficas:
+                    with ui.card().classes("w-full mb-4"):
+                        ui.label(titulo).classes("text-lg font-bold")
+                        ui.plotly(grafico).classes("w-full h-[600px]")
 
         def actualizar_inputs(event):
             lista_inputs.clear()
@@ -37,17 +47,8 @@ def render_graphics_view():
                     end = str(date.today())
                     df = get_price_data(activo_seleccionado.value, start, end)
                     fig = build_volume_chart(df, activo_seleccionado.value, start, end)
-
-                    # Añadir la gráfica generada a la lista
                     graficas_generadas.insert(0, (f"Gráfica de Volumen: {activo_seleccionado.value} ({start} - {end})", fig))
-
-                    # Limpiar contenedor de gráficas y volver a cargar en orden
-                    contenedor_graficas.clear()
-                    for titulo, grafico in graficas_generadas:
-                        with contenedor_graficas:
-                            with ui.card().classes("w-full mb-4"):
-                                ui.label(titulo).classes("text-lg font-bold")
-                                ui.plotly(grafico).classes("w-full h-[600px]")
+                    actualizar_contenedor_graficas()
 
                 with boton_generar:
                     ui.button("Generar gráfica", on_click=generar_volumen).classes("mt-2")
@@ -59,10 +60,10 @@ def render_graphics_view():
                     with ui.row():  # Colocamos ambos calendarios en la misma fila
                         with ui.column():
                             ui.label("Fecha de inicio")
-                            fecha_inicio = ui.date().classes("W-1/2")
+                            fecha_inicio = ui.date().classes("w-1/2")
                         with ui.column():
                             ui.label("Fecha de fin")
-                            fecha_fin = ui.date().classes("W-1/2")
+                            fecha_fin = ui.date().classes("w-1/2")
 
                 def generar_comparacion():
                     f_ini = fecha_inicio.value
@@ -95,18 +96,10 @@ def render_graphics_view():
 
                     try:
                         fig = build_volume_comparison_chart_multiple(activos_dfs, f_ini, f_fin)
-
                         # Añadir la gráfica generada a la lista
                         activos_nombres = ', '.join(activos)
                         graficas_generadas.insert(0, (f"Comparación de Volumen: {activos_nombres} ({f_ini} - {f_fin})", fig))
-
-                        # Limpiar contenedor de gráficas y volver a cargar en orden
-                        contenedor_graficas.clear()
-                        for titulo, grafico in graficas_generadas:
-                            with contenedor_graficas:
-                                with ui.card().classes("w-full mb-4"):
-                                    ui.label(titulo).classes("text-lg font-bold")
-                                    ui.plotly(grafico).classes("w-full h-[600px]")
+                        actualizar_contenedor_graficas()
 
                     except Exception as e:
                         ui.notify(f"Error al construir la gráfica: {e}", type="error")
@@ -114,6 +107,35 @@ def render_graphics_view():
                 with boton_generar:
                     ui.button("Generar comparación", on_click=generar_comparacion).classes("mt-2")
 
+            elif event.value == "Anual":
+                with lista_inputs:
+                    ui.label("Activo")
+                    activo_seleccionado = ui.select(ACTIVOS, value=ACTIVOS[0])
+                    ui.label("Año")
+                    year = ui.number(
+                        value=datetime.now().year,
+                        min=1990,
+                        max=datetime.now().year,
+                        format="%.0f"
+                    )
+
+                def generar_anual():
+                    try:
+                        chart_data = build_annual_candlestick(
+                            ticker=activo_seleccionado.value,
+                            year=int(year.value)
+                        )
+                        fig = go.Figure(chart_data)
+                        graficas_generadas.insert(0, (
+                            f"Gráfica Anual: {activo_seleccionado.value} ({int(year.value)})", 
+                            fig
+                        ))
+                        actualizar_contenedor_graficas()
+                    except Exception as e:
+                        ui.notify(f"Error al generar gráfica anual: {str(e)}", type='negative')
+
+                with boton_generar:
+                    ui.button("Generar gráfica anual", on_click=generar_anual).classes("mt-2")
+
         actualizar_inputs(metodo_grafica_seleccionada)
         metodo_grafica_seleccionada.on_value_change(actualizar_inputs)
-
