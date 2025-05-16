@@ -1,6 +1,6 @@
 from nicegui import ui
 from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_analysis
-
+import pandas as pd
 
 def render_strategy_view():
     with ui.card().classes('p-4 w-full'):
@@ -30,6 +30,10 @@ def render_strategy_view():
                     end=end.value
                 )
                 
+                # Ajustado datos
+                señales["fecha"]=señales["fecha"].astype(str)
+                señales_dicc=señales.to_dict(orient="records")
+
                 output.clear()
                 with output:
                     ui.label(f'Se generaron {len(señales)} señales:\n').classes("font-bold")
@@ -38,8 +42,10 @@ def render_strategy_view():
                         columns = [
                             {'name': 'indice', 'label': 'Índice', 'field': 'indice', 'align': 'center'},
                             {'name': 'fecha', 'label': 'Fecha', 'field': 'fecha', 'align': 'left'},
-                            {'name': 'accion', 'label': 'Acción', 'field': 'accion', 'align': 'left'}],
-                        rows = [{"indice": index, "fecha": fecha.date(), "accion": accion} for index, fecha, accion in señales],
+                            {'name': 'volumen', 'label': 'Volumen', 'field': 'volumen', 'align': 'left'},
+                            {'name': 'cierre', 'label': 'Precio cierre', 'field': 'cierre', 'align': 'left'},
+                            {'name': 'compra', 'label': 'Compra', 'field': 'compra', 'align': 'left'}],
+                        rows = señales_dicc,
                         pagination={'rowsPerPage': 10})
                     
             except Exception as e:

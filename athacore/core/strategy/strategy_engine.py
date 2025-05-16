@@ -3,7 +3,7 @@ from athacore.core.indicators.indicators import sma, rsi, macd
 import pandas as pd
 
 
-def estrategia_basica_medias(df: pd.DataFrame) -> list:
+def estrategia_basica_medias(df: pd.DataFrame) -> pd.DataFrame:
     """Compra si cruce de SMA corto sobre SMA largo, vende si lo contrario."""
     df['SMA_short'] = sma(df, 5)
     df['SMA_long'] = sma(df, 20)
@@ -11,11 +11,13 @@ def estrategia_basica_medias(df: pd.DataFrame) -> list:
     señales = []
     for i in range(1, len(df)):
         if df['SMA_short'].iloc[i] > df['SMA_long'].iloc[i] and df['SMA_short'].iloc[i - 1] <= df['SMA_long'].iloc[i - 1]:
-            señales.append((df.index[i], df["Date"][i], 'BUY'))
+            señales.append((df.index[i], df.iloc[i]["Date"], df.iloc[i]["Volume"], df.iloc[i]["Close"], True))
         elif df['SMA_short'].iloc[i] < df['SMA_long'].iloc[i] and df['SMA_short'].iloc[i - 1] >= df['SMA_long'].iloc[i - 1]:
-            señales.append((df.index[i], df["Date"][i], 'SELL'))
-    return señales
+            señales.append((df.index[i], df.iloc[i]["Date"], df.iloc[i]["Volume"], df.iloc[i]["Close"], False))
 
+    columnas = ["indice", "fecha", "volumen", "cierre", "compra"]
+    señales_df = pd.DataFrame(señales, columns=columnas)
+    return señales_df
 
 def estrategia_rsi_simple(df: pd.DataFrame) -> list:
     """Compra cuando RSI < 30, vende cuando RSI > 70."""
@@ -56,7 +58,7 @@ def mostrar_estrategias() -> dict:
     }
 
 
-def run_analysis(strategy_name: str, ticker: str, start: str, end: str) -> list:
+def run_analysis(strategy_name: str, ticker: str, start: str, end: str) -> pd.DataFrame:
     """
     Ejecuta el análisis completo: obtiene datos, aplica estrategia y retorna señales.
     """
