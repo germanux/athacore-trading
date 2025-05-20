@@ -1,6 +1,5 @@
 from nicegui import ui
 from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_analysis
-import pandas as pd
 
 def render_strategy_view():
     with ui.card().classes('p-4 w-full'):
