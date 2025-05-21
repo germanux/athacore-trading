@@ -1,4 +1,4 @@
-from athacore.core.data.market_data import get_price_data
+from athacore.core.data.market_data_yhfinance import get_price_data
 from athacore.core.indicators.indicators import sma, rsi, macd
 import pandas as pd
 

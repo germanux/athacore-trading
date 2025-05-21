@@ -1,6 +1,6 @@
 from nicegui import ui
 from datetime import date, datetime
-from athacore.core.data.market_data import get_price_data
+from athacore.core.data.market_data_yhfinance import get_price_data
 from athacore.core.graphics.charts.volume_chart import build_volume_chart
 from athacore.core.graphics.charts.comparison_chart import build_volume_comparison_chart_multiple
 from athacore.core.graphics.charts.anual_chart import build_annual_candlestick
