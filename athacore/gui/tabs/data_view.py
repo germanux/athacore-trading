@@ -1,7 +1,7 @@
 # gui/tabs/data_view.py
 
 from nicegui import ui
-from athacore.core.data.market_data import get_price_data
+from athacore.core.data.market_data_alpha_vantage import get_price_data
 
 
 def render_data_view():
