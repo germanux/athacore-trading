@@ -1,20 +1,53 @@
-# gui/tabs/data_view.py
-
+# athacore/gui/tabs/data_view.py
 from nicegui import ui
-from athacore.core.data.market_data_alpha_vantage import get_price_data
-
+from athacore.core.data.market_data import get_price_data
 
 def render_data_view():
-    with ui.column().classes('p-4'):
-        ticker_input = ui.input('Símbolo (ej: AAPL)').props('outlined')
-        status_label = ui.label()
+    with ui.card().classes('p-6 w-full max-w-2xl mx-auto'):
+        ui.label('Consulta de datos históricos de IB').classes('text-xl font-bold mb-4')
 
-        def mostrar_datos():
+        # Inputs
+        ticker_input = ui.input('Símbolo (ej: AAPL)').props('outlined dense').classes('w-full')
+        status_label = ui.label().classes('text-sm mt-2 text-red-500')
+        resultado_label = ui.label().classes('text-lg font-medium text-green-700 mt-2')
+        table_container = ui.column().classes('mt-4')
+
+        async def mostrar_datos():
+            status_label.set_text('')
+            resultado_label.set_text('')
+            table_container.clear()
+
+            symbol = ticker_input.value.strip().upper()
+            if not symbol:
+                status_label.set_text('⚠️ Debes ingresar un símbolo.')
+                return
+
             try:
-                df = get_price_data(ticker_input.value, '2020-01-01', '2025-02-01')
-                cierre = df['Close'].iloc[-1]
-                status_label.set_text(f'Último cierre de {ticker_input.value.upper()}: {cierre:.2f}')
-            except Exception as e:
-                status_label.set_text(f'Error: {e}')
+                result = await get_price_data(symbol)
+                df = result["data"]
+                info = result["info"]
 
-        ui.button('Consultar', on_click=mostrar_datos)
+                # Muestra info general
+                resultado_label.set_text(
+                    f"📊 {info['name']} ({info['symbol']})\n"
+                    f"💱 Tipo: {info['secType']} | Bolsa: {info['exchange']} | Moneda: {info['currency']}"
+                )
+
+                # Muestra los últimos datos históricos en tabla
+                ui.table(columns=[
+                    {'name': c, 'label': c.capitalize(), 'field': c} for c in df.columns
+                ],
+                rows=df.tail(10).to_dict('records'),
+                pagination=10).classes('w-full').bind_to(table_container)
+
+            except Exception as e:
+                status_label.set_text(f'❌ Error: {e}')
+
+        # Botón para consultar
+        ui.button('Consultar', on_click=mostrar_datos).props('color=primary').classes('mt-2')
+
+
+
+
+
+
