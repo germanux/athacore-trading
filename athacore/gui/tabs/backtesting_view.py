@@ -15,10 +15,11 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, status_label
             #Renderizado
             status_label.clear()
 
-            with status_label:
-                with ui.row():
-                    for a, b in resultado.items():
-                         ui.label(f"{a.upper()}: {b}")
+            with status_label:                        
+                ui.table(
+                    columns=[{'name': key, 'label': key.upper(), 'field': key} for key in resultado],
+                    rows=[resultado]
+                )
                          
                 columna_graficas = ui.column()
 
@@ -29,13 +30,13 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, status_label
                         fig = go.Figure()
                         fig.add_trace(go.Scatter(
                             x=diccionario["fecha"],
-                            y=diccionario["dinero"],
+                            y=diccionario["price"],
                             mode='lines',
                             name='Volumen'
                         ))
                         
                         fig.update_layout(
-                            title=f"Crecimiento del dinero invertido",
+                            title=f"Gráfica de {ticker} entre {start} y {end}",
                             xaxis_title="Fecha",
                             yaxis_title="Dinero",
                             xaxis=dict(tickformat="%Y-%m-%d", type="date")
