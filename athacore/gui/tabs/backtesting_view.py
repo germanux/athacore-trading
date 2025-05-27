@@ -6,11 +6,11 @@ from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_anal
 
 ESTRATEGIAS = list(mostrar_estrategias().keys())
 
-def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, status_label):
+def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_cash, status_label):
         try:
             señales = run_analysis(estrategia, ticker, start, end)
 
-            resultado, diccionario = run_backtest(señales, "compra", initial_cash)
+            resultado, diccionario = run_backtest(señales, "compra", initial_cash, percentage_cash)
 
             #Renderizado
             status_label.clear()
@@ -28,13 +28,13 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, status_label
                         columna_graficas.clear()
 
                         fig = go.Figure()
+                        fig.add_hline(y=initial_cash, line=dict(color="orange", width=1))
                         fig.add_trace(go.Scatter(
                             x=diccionario["fecha"],
-                            y=diccionario["price"],
+                            y=diccionario["dinero"],
                             mode='lines',
                             name='Volumen'
                         ))
-                        
                         fig.update_layout(
                             title=f"Gráfica de {ticker} entre {start} y {end}",
                             xaxis_title="Fecha",
@@ -64,7 +64,8 @@ def render_backtesting_view():
                 start = ui.input('Fecha inicio (YYYY-MM-DD)').props('outlined')
                 end = ui.input('Fecha fin (YYYY-MM-DD)').props('outlined')
                 initial_cash = ui.input('Dinero inicial').props('outlined')
+                percentage_cash = ui.input('Porcentaje por inversión').props('outlined')
 
-                ui.button('Ejecutar Backtest', on_click=lambda:ejecutar_backtest(estrategia.value, ticker.value, start.value, end.value, initial_cash.value, output))
+                ui.button('Ejecutar Backtest', on_click=lambda:ejecutar_backtest(estrategia.value, ticker.value, start.value, end.value, initial_cash.value, int(percentage_cash.value), output))
 
             output = ui.column().classes("w-2/3 justify-content")
