@@ -2,7 +2,7 @@
 from alpha_vantage.timeseries import TimeSeries
 import pandas as pd
 
-API_KEY = 'PE4PD5KAIAK4VS72'  #API KEY
+API_KEY = 'TGKRRFLLV1V6JBWN'  #API KEY PE4PD5KAIAK4VS72
 
 def get_price_data(symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
     # Inicializar el object TimeSeries de Alpha Vantage 
