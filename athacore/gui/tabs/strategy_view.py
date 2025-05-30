@@ -1,10 +1,13 @@
 from nicegui import ui
 from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_analysis
-from athacore.core.execution.order_executor import execute_order, send_order_to_ibkr, simulate_order, IBClient  # ✅ IMPORTACIÓN AÑADIDA
+from athacore.core.execution.order_executor import execute_order
+from datetime import date
+import pandas as pd
+
 
 def render_strategy_view():
     with ui.card().classes('p-4 w-full'):
-        ui.label('🧠 Estrategias de Trading')
+        ui.label('📈 Estrategias de Trading y Ejecución en IB Gateway').classes('text-2xl font-bold')
 
         ESTRATEGIAS = list(mostrar_estrategias().keys())
 
@@ -18,80 +21,114 @@ def render_strategy_view():
                 )
                 ticker = ui.input('Ticker (ej: AAPL)').props('outlined')
                 start = ui.input('Fecha inicio (YYYY-MM-DD)').props('outlined')
-                end = ui.input('Fecha fin (YYYY-MM-DD)').props('outlined')
-                modo = ui.select(['simulacion', 'real'], label='Modo ejecución').props('outlined dense')  # ✅ AÑADIDO
 
             output = ui.column().classes("w-2/3")
 
         def ejecutar():
+            if not (estrategia.value and ticker.value and start.value):
+                ui.notify("Debes seleccionar estrategia, ticker y fecha de inicio.", type='warning')
+                return
+
             try:
+                fecha_fin = date.today().isoformat()
+
                 señales = run_analysis(
                     strategy_name=estrategia.value,
-                    ticker=ticker.value,
+                    ticker=ticker.value.upper(),
                     start=start.value,
-                    end=end.value
+                    end=fecha_fin
                 )
 
-                señales["fecha"] = señales["fecha"].astype(str)
+                if señales.empty:
+                    output.clear()
+                    with output:
+                        ui.label('⚠️ No se generaron señales con los datos seleccionados.').classes('text-yellow-600 font-semibold')
+                    return
+
+                # Convertir datetime a string para evitar errores en JSON
+                for col in señales.columns:
+                    if pd.api.types.is_datetime64_any_dtype(señales[col]):
+                        señales[col] = señales[col].astype(str)
+
+                if pd.api.types.is_datetime64_any_dtype(señales.index):
+                    señales = señales.reset_index()
+                    for col in señales.columns:
+                        if pd.api.types.is_datetime64_any_dtype(señales[col]):
+                            señales[col] = señales[col].astype(str)
+
                 señales_dicc = señales.to_dict(orient="records")
 
                 output.clear()
                 with output:
-                    ui.label(f'Se generaron {len(señales)} señales:\n').classes("font-bold")
+                    ui.label(f'✅ Estrategia ejecutada: {len(señales_dicc)} señales generadas').classes("font-bold")
                     ui.table(
-                        title="Listado de señales",
+                        title="📊 Resultado de señales",
                         columns=[
                             {'name': 'indice', 'label': 'Índice', 'field': 'indice', 'align': 'center'},
                             {'name': 'fecha', 'label': 'Fecha', 'field': 'fecha', 'align': 'left'},
                             {'name': 'volumen', 'label': 'Volumen', 'field': 'volumen', 'align': 'left'},
                             {'name': 'cierre', 'label': 'Precio cierre', 'field': 'cierre', 'align': 'left'},
-                            {'name': 'compra', 'label': 'Compra', 'field': 'compra', 'align': 'left'}],
+                            {'name': 'compra', 'label': 'Compra', 'field': 'compra', 'align': 'center'},
+                            {'name': 'venta', 'label': 'Venta', 'field': 'venta', 'align': 'center'},
+                        ],
                         rows=señales_dicc,
                         pagination={'rowsPerPage': 10}
                     )
 
-                    # ✅ NUEVO: Sección de ejecución de órdenes si hay señales de compra o venta
                     for i, señal in enumerate(señales_dicc):
-                        if señal.get('compra', False):
+                        volumen = int(señal.get('volumen', 0))
+                        volumen = min(volumen, 1000)  # Límite seguro para evitar errores IBKR
+
+                        if señal.get('compra'):
                             with ui.row().classes('items-center gap-4'):
-                                ui.label(f"{i+1}. Ejecutar compra de {señal['volumen']} {ticker.value.upper()}")
+                                ui.label(f"{i+1}. Recomendación: ✅ COMPRAR {volumen} de {ticker.value.upper()}")
 
                                 def crear_handler_compra(s=señal):
                                     async def handler():
-                                        resultado = execute_order(
-                                            symbol=ticker.value.upper(),
-                                            action="BUY",
-                                            quantity=int(s['volumen']),
-                                            mode=modo.value
-                                        )
-                                        ui.notify(resultado, type='info' if 'Simulación' in resultado else 'success')
+                                        try:
+                                            cantidad = min(int(s.get('volumen', 0)), 1000)
+                                            resultado = await execute_order(
+                                                symbol=ticker.value.upper(),
+                                                action="BUY",
+                                                quantity=cantidad,
+                                                mode='real'
+                                            )
+                                            ui.notify(resultado, type='success' if 'Orden' in resultado else 'warning')
+                                        except Exception as e:
+                                            ui.notify(f'❌ Error al ejecutar orden: {e}', type='negative')
                                     return handler
 
-                                ui.button('Ejecutar orden compra', on_click=crear_handler_compra()).props('color=primary')
+                                ui.button('Ejecutar orden de COMPRA', on_click=crear_handler_compra()).props('color=primary')
 
-                        # Supongamos que la señal de venta está en una columna 'venta' (bool)
-                        if señal.get('venta', False):
+                        elif señal.get('venta'):
                             with ui.row().classes('items-center gap-4'):
-                                ui.label(f"{i+1}. Ejecutar venta de {señal['volumen']} {ticker.value.upper()}")
+                                ui.label(f"{i+1}. Recomendación: 🔻 VENDER {volumen} de {ticker.value.upper()}")
 
                                 def crear_handler_venta(s=señal):
                                     async def handler():
-                                        resultado = execute_order(
-                                            symbol=ticker.value.upper(),
-                                            action="SELL",
-                                            quantity=int(s['volumen']),
-                                            mode=modo.value
-                                        )
-                                        ui.notify(resultado, type='info' if 'Simulación' in resultado else 'success')
+                                        try:
+                                            cantidad = min(int(s.get('volumen', 0)), 1000)
+                                            resultado = await execute_order(
+                                                symbol=ticker.value.upper(),
+                                                action="SELL",
+                                                quantity=cantidad,
+                                                mode='real'
+                                            )
+                                            ui.notify(resultado, type='success' if 'Orden' in resultado else 'warning')
+                                        except Exception as e:
+                                            ui.notify(f'❌ Error al ejecutar orden: {e}', type='negative')
                                     return handler
 
-                                ui.button('Ejecutar orden venta', on_click=crear_handler_venta()).props('color=negative')
+                                ui.button('Ejecutar orden de VENTA', on_click=crear_handler_venta()).props('color=negative')
+
+                        else:
+                            with ui.row().classes('items-center gap-4'):
+                                ui.label(f"{i+1}. Recomendación: 🟡 MANTENER posición en {ticker.value.upper()}")
 
             except Exception as e:
                 output.clear()
                 with output:
-                    ui.label(f'Error: {e}').classes('text-red-600 font-bold')
+                    ui.label(f'❌ Error al ejecutar la estrategia: {e}').classes('text-red-600 font-bold')
 
         with inputs:
-            ui.button('Ejecutar estrategia', on_click=ejecutar)
-
+            ui.button('Ejecutar estrategia', on_click=ejecutar).props('color=secondary')
