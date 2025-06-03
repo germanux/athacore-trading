@@ -1,6 +1,5 @@
 from nicegui import ui
 import plotly.graph_objects as go
-from athacore.core.strategy.strategy_engine import run_analysis
 from athacore.core.backtesting.backtester import run_backtest
 from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_analysis
 
@@ -49,11 +48,24 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_c
             with status_label:
                  ui.label(f'Error: {e}')
 
+def print_config(estrategiaObj, container):
+    try:
+        # ui.label(f"Configuracion de f{self.name}")
+        container.clear()
+        with container:
+            ui.label(f"Configuracion de la estrategia seleccionada").classes("font-bold")
+            with ui.list().props('dense separator'):
+                for parametro, valor in estrategiaObj.get_default_config().items(): #A la espera de configuraciones para cada estrategia
+                    if valor:
+                        ui.item(f"{parametro.upper()}: {valor}")
+    except:
+        pass
+
 def render_backtesting_view():
     with ui.card().classes('p-4 w-full'):
         ui.label('🧠 Backtesting')
-        with ui.row().classes("w-full gap-0"):
-            inputs = ui.column().classes("w-1/3")
+        with ui.row().classes("w-full  gap-3"):
+            inputs = ui.column().classes("width: 15em")
             with inputs:
                 estrategia = ui.select(
                     options=ESTRATEGIAS,
@@ -68,4 +80,9 @@ def render_backtesting_view():
 
                 ui.button('Ejecutar Backtest', on_click=lambda:ejecutar_backtest(estrategia.value, ticker.value, start.value, end.value, initial_cash.value, int(percentage_cash.value), output))
 
-            output = ui.column().classes("w-2/3 justify-content")
+            output = ui.column().classes("items-center")
+
+            strategy_data = ui.column()
+            estrategiaObj = mostrar_estrategias().get(estrategia.value)
+            print_config(estrategiaObj, strategy_data)
+            estrategia.on('change', lambda:print_config(estrategiaObj, strategy_data))
