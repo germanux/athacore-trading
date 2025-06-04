@@ -1,5 +1,5 @@
 from nicegui import ui
-from athacore.core.execution.order_executor import execute_order
+from athacore.core.execution.order_executor_2 import execute_order
 
 
 def render_execution_view():
@@ -9,11 +9,18 @@ def render_execution_view():
         status_label = ui.label()
 
         def enviar_orden(tipo):
-            try:
-                resultado = execute_order(symbol_input.value, tipo, int(quantity_input.value))
-                status_label.set_text(f'✅ {resultado}')
-            except Exception as e:
-                status_label.set_text(f'Error: {e}')
+            async def handler():
+                try:
+                    resultado = await execute_order(
+                                                symbol=symbol_input.value,
+                                                action=tipo,
+                                                quantity=int(quantity_input.value),
+                                                mode='real'
+                                            )
+                    status_label.set_text(f'✅ {resultado}')
+                except Exception as e:
+                    status_label.set_text(f'Error: {e}')
+            return handler
 
-        ui.button('Comprar', on_click=lambda: enviar_orden('BUY'))
-        ui.button('Vender', on_click=lambda: enviar_orden('SELL'))
+        ui.button('Comprar', on_click= enviar_orden('BUY'))
+        ui.button('Vender', on_click= enviar_orden('SELL'))
