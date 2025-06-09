@@ -5,7 +5,7 @@ ib = IB()
 
 async def connect_ib():
     if not ib.isConnected():
-        await ib.connectAsync('127.0.0.1', 7497, clientId=1234)
+        await ib.connectAsync('127.0.0.1', 4002, clientId=1)
 
 async def execute_order(symbol: str, action: str, quantity: int, mode: str = "real") -> str:
     try:
