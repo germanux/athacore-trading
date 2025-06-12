@@ -6,7 +6,7 @@ from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_anal
 ESTRATEGIAS = list(mostrar_estrategias().keys())
 
 #Listas credas para cada menú de selección. A espera de un estándar
-CANDLE_SIZE_OPTIONS = ["1 minuto", "5 minutos", "15 minutos", "30 minutos", "1 día", "1 semana", "1 mes"] #   1 mes sirve sobretodo para analizar mercado o inversiones a largo plazo
+CANDLE_SIZE_OPTIONS = ["1 minuto", "5 minutos", "15 minutos", "30 minutos", "1 día", "1 semana", "1 mes"]
 EXECUTION_FRECUENCY_OPTIONS =["Con nuevas velas", "Por frecuencia", "Por horario", "Con cambios de mercado", "Manual"]
 SYMBOLS_SUPPORTED_OPTIONS = ["AAPL", "IONQ"]
 
@@ -80,6 +80,7 @@ def set_values(estrategiaObj,
                 slippage_tolerance):
     
     dicc_config = estrategiaObj.get_default_config()
+    global SYMBOLS_SUPPORTED_OPTIONS
     """
     REFERENCIA DE CONFIGURACIÓN DE ESTRATEGIAS
     candle_size": "15min",
@@ -98,18 +99,29 @@ def set_values(estrategiaObj,
     total_data_needed.value = dicc_config["total_data_needed"]
     execution_frequency.value = dicc_config["execution_frequency"]
     signal_delay.value = dicc_config["signal_delay"]
-    time_filter_start.value = dicc_config["time_filter"]["start"] # <--- Este formato impide hacer directamente el bucle
+    time_filter_start.value = dicc_config["time_filter"]["start"]
     time_filter_end.value = dicc_config["time_filter"]["end"]
-    symbols_supported.value = dicc_config["symbols_supported"]
+    symbols_supported.autocomplete = dicc_config["symbols_supported"]    #Pendiente de revisión
     slippage_tolerance.value = dicc_config["slippage_tolerance"]
 
-def cambiar_visibilidad(container):
-    global visibilidad
-    if visibilidad:
-        visibilidad = False
+def ticker_support(ticker, ticker_state):
+    if SYMBOLS_SUPPORTED_OPTIONS:
+        if ticker in SYMBOLS_SUPPORTED_OPTIONS:
+            ticker_state.text = "✅ Símbolo soportado"
+        else:
+            ticker_state.text = "❌ Símbolo no soportado"
     else:
-        visibilidad = True
-    container.visible = visibilidad
+        ticker_state.text = "No hay información sobre símbolos soportados"
+        
+def input_type_change(value, container_date, container_candle):
+    container_date.visible = False
+    container_candle.visible = False
+
+    print(value)
+    if value == "Por fecha":
+        container_date.visible = True
+    elif value == "Por velas":
+        container_candle.visible = True
 
 def render_backtesting_view():
     with ui.card().classes('p-4 w-full'):
@@ -117,57 +129,68 @@ def render_backtesting_view():
         with ui.row().classes("w-full  gap-3"):
             inputs = ui.column().classes("width: 15em items-stretch")
             with inputs:
+                ui.label("Opciones básicas").classes("font-bold mt-2")
                 estrategia = ui.select(
                     options=ESTRATEGIAS,
                     label='Selecciona una estrategia',
-                    value=ESTRATEGIAS[0]
-                )
-                ticker = ui.input('Ticker (ej: AAPL)').props('outlined')
-                start = ui.input('Fecha inicio (YYYY-MM-DD)').props('outlined')
-                end = ui.input('Fecha fin (YYYY-MM-DD)').props('outlined')
-                initial_cash = ui.input('Dinero inicial').props('outlined')
-                percentage_cash = ui.input('Porcentaje por inversión').props('outlined')
+                    value=ESTRATEGIAS[0])
+                
+                ticker = ui.input('Ticker (ej: AAPL)', autocomplete=SYMBOLS_SUPPORTED_OPTIONS)
+                ticker_state = ui.label("Esperando entrada de un ticker...")
 
+                initial_cash = ui.input('Dinero inicial')
+                percentage_cash = ui.input('Porcentaje por inversión')
 
+                ui.label("Tipo de backtesting").classes("font-bold mt-2")
+                
+                input_type=ui.select(
+                    options=["Por fecha", "Por velas"],
+                    label='Selecciona un tipo de entrada',
+                    value="Por fecha",
+                ).on_value_change(lambda _:input_type_change(input_type.value, inputs_by_date, inputs_by_candles))
+                
+                inputs_by_date = ui.column().classes("items-stretch")
+                inputs_by_candles = ui.column().classes("items-stretch")
+                
+                with inputs_by_date:
+                    start = ui.input('Fecha inicio (YYYY-MM-DD)')
+                    end = ui.input('Fecha fin (YYYY-MM-DD)')
 
-                opciones_avanzadas = ui.column().classes("items-stretch justify-between")
-                opciones_avanzadas.visible = visibilidad
-                with opciones_avanzadas:
-                    ui.label("Opciones avanzadas")
+                with inputs_by_candles:
                     candle_size = ui.select(
                         options=CANDLE_SIZE_OPTIONS,
                         label="Tamaño de velas (candle_size)",
                         value=CANDLE_SIZE_OPTIONS[4])
-                    lookback_period = ui.input("Periodo de análisis por velas (lookback_period)")
-                    total_data_needed = ui.input("Total de datos necesarios")
-                    execution_frequency = ui.select(
-                        options=EXECUTION_FRECUENCY_OPTIONS,
-                        label="Frecuencia de ejecución",
-                        value=EXECUTION_FRECUENCY_OPTIONS[2]
-                    )
-                    signal_delay = ui.number("Retraso de señal (signal delay)", value=1)
-                    ui.label("Horario permitido:")
-                    with ui.row():
-                        time_filter_start = ui.input("Hora de inicio", value="09:00")  # Se puede cambiar por ui.time()
-                        time_filter_end= ui.input("Hora de fin", value="17:00")
-                    if SYMBOLS_SUPPORTED_OPTIONS:                                      # Cuando se tengan listas oficiales en vez de una seleccion se podria hacer una comprobación con el de arriba
-                        symbols_supported =ui.select(
-                            options=SYMBOLS_SUPPORTED_OPTIONS,
-                            label="Tickers soportados",
-                            value=SYMBOLS_SUPPORTED_OPTIONS[0]
-                        )
-                    slippage_tolerance = ui.number("Tolerancia al deslizamiento (%)", min=0, max=100)
+                        # Inputs que solo son informativos por ahora
+                    lookback_period = ui.input("Periodo de análisis por velas (lookback_period)").classes("bg-gray-100")
+                    total_data_needed = ui.input("Total de datos necesarios").classes("bg-gray-100")
+
+                ui.label("Opciones extra").classes("font-bold mt-2")
+                
+                execution_frequency = ui.select(
+                    options=EXECUTION_FRECUENCY_OPTIONS,
+                    label="Frecuencia de ejecución",
+                    value=EXECUTION_FRECUENCY_OPTIONS[2]
+                )
+                signal_delay = ui.number("Retraso de señal (signal delay)", value=1)
+                ui.label("Horario permitido:")
+                with ui.row():
+                    time_filter_start = ui.input("Hora de inicio", value="09:00")  # Se puede cambiar por ui.time()
+                    time_filter_end= ui.input("Hora de fin", value="17:00")
+                slippage_tolerance = ui.number("Tolerancia al deslizamiento (%)", min=0, max=100)
          
-                ui.button("Opciones avanzadas", on_click=lambda:cambiar_visibilidad(opciones_avanzadas))
                 ui.button('Ejecutar Backtest', on_click=lambda:ejecutar_backtest(estrategia.value, ticker.value, start.value, end.value, initial_cash.value, int(percentage_cash.value), output))
 
             output = ui.column().classes("items-center")
-            strategy_data = ui.column()
+            strategy_data = ui.column().classes('bg-gray-100 p-2 rounded')
 
 
             # === LÓGICA ESTRATEGIAS === #
+            print_config(mostrar_estrategias().get(estrategia.value), strategy_data)
+            input_type_change(input_type.value, inputs_by_date, inputs_by_candles)
+
             estrategiaObj = mostrar_estrategias().get(estrategia.value) # Tomar el objeto estrategia equivalente al de la lista de opciones
-            
+                                                                        # Habra que actualizarlo tambien. Que sea dinámica la variable
 
             #Event listeners
             estrategia.on_value_change(lambda _: print_config(mostrar_estrategias().get(estrategia.value), strategy_data))
@@ -179,5 +202,6 @@ def render_backtesting_view():
                                                         signal_delay,
                                                         time_filter_start,
                                                         time_filter_end,
-                                                        symbols_supported,
+                                                        ticker,
                                                         slippage_tolerance))
+            ticker.on_value_change(lambda _: ticker_support(ticker.value, ticker_state))
