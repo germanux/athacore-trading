@@ -164,6 +164,7 @@ def render_backtesting_view():
                         # Inputs que solo son informativos por ahora
                     lookback_period = ui.input("Periodo de análisis por velas (lookback_period)").classes("bg-gray-100")
                     total_data_needed = ui.input("Total de datos necesarios").classes("bg-gray-100")
+                    end = ui.input('Fecha fin (YYYY-MM-DD)')
 
                 ui.label("Opciones extra").classes("font-bold mt-2")
                 
