@@ -1,12 +1,21 @@
 from nicegui import ui
 from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_analysis
 from athacore.core.execution.order_executor import execute_order
-from datetime import date
+from datetime import date, datetime, timedelta
 import pandas as pd
 import asyncio
+import pytz
+import uuid
 
 # Variable global para controlar órdenes activas y ejecutadas
 ordenes_registro = []
+
+def esta_en_horario_valido():
+    madrid = pytz.timezone('Europe/Madrid')
+    ahora = datetime.now(madrid).time()
+    hora_inicio = datetime.strptime("15:30", "%H:%M").time()
+    hora_fin = datetime.strptime("22:00", "%H:%M").time()
+    return hora_inicio <= ahora <= hora_fin
 
 def render_strategy_view():
     with ui.card().classes('p-4 w-full'):
@@ -74,7 +83,6 @@ def render_strategy_view():
 
             output = ui.column().classes("w-2/3")
 
-        # UI para mostrar registro de órdenes (actualizable)
         ordenes_area = ui.column().classes('mt-6')
 
         def actualizar_registro_ordenes():
@@ -100,7 +108,6 @@ def render_strategy_view():
                             with ui.row().classes('gap-2'):
                                 def crear_handler_cancelar(oid=uid):
                                     async def cancelar():
-                                        # Aquí se debería implementar la lógica real para cancelar la orden en IBKR
                                         for o in ordenes_registro:
                                             if o['id'] == oid:
                                                 o['estado'] = 'cancelada'
@@ -110,7 +117,6 @@ def render_strategy_view():
 
                                 def crear_handler_pausar(oid=uid):
                                     async def pausar():
-                                        # Aquí se debería implementar la lógica para pausar (simulada)
                                         for o in ordenes_registro:
                                             if o['id'] == oid:
                                                 o['estado'] = 'pausada'
@@ -122,8 +128,6 @@ def render_strategy_view():
                                 ui.button('Pausar', on_click=crear_handler_pausar()).props('color=warning')
 
         def registrar_orden(symbol, action, quantity):
-            # Generar ID simple para orden
-            import uuid
             uid = str(uuid.uuid4())[:8]
             orden = {
                 'id': uid,
@@ -135,6 +139,70 @@ def render_strategy_view():
             ordenes_registro.append(orden)
             actualizar_registro_ordenes()
             return uid
+
+        def crear_handler_compra(s):
+            async def handler():
+                if not esta_en_horario_valido():
+                    ui.notify("⛔ Fuera del horario permitido (15:30 - 22:00 hora española)", type='warning')
+                    return
+
+                cantidad = min(int(s.get('volumen', 0)), 1000)
+                uid = registrar_orden(ticker.value.upper(), "BUY", cantidad)
+
+                try:
+                    resultado = await asyncio.wait_for(
+                        execute_order(
+                            symbol=ticker.value.upper(),
+                            action="BUY",
+                            quantity=cantidad,
+                            mode='real'
+                        ),
+                        timeout=5.0
+                    )
+                    for o in ordenes_registro:
+                        if o['id'] == uid:
+                            o['estado'] = 'ejecutada' if 'Orden' in resultado else 'error'
+                    ui.notify(resultado, type='success' if 'Orden' in resultado else 'negative')
+                except asyncio.TimeoutError:
+                    for o in ordenes_registro:
+                        if o['id'] == uid:
+                            o['estado'] = 'cancelada'
+                    ui.notify("❌ La orden fue cancelada por tiempo de espera (5 segundos sin respuesta).", type='warning')
+
+                actualizar_registro_ordenes()
+            return handler
+
+        def crear_handler_venta(s):
+            async def handler():
+                if not esta_en_horario_valido():
+                    ui.notify("⛔ Fuera del horario permitido (15:30 - 22:00 hora española)", type='warning')
+                    return
+
+                cantidad = min(int(s.get('volumen', 0)), 1000)
+                uid = registrar_orden(ticker.value.upper(), "SELL", cantidad)
+
+                try:
+                    resultado = await asyncio.wait_for(
+                        execute_order(
+                            symbol=ticker.value.upper(),
+                            action="SELL",
+                            quantity=cantidad,
+                            mode='real'
+                        ),
+                        timeout=5.0
+                    )
+                    for o in ordenes_registro:
+                        if o['id'] == uid:
+                            o['estado'] = 'ejecutada' if 'Orden' in resultado else 'error'
+                    ui.notify(resultado, type='success' if 'Orden' in resultado else 'negative')
+                except asyncio.TimeoutError:
+                    for o in ordenes_registro:
+                        if o['id'] == uid:
+                            o['estado'] = 'cancelada'
+                    ui.notify("❌ La orden fue cancelada por tiempo de espera (5 segundos sin respuesta).", type='warning')
+
+                actualizar_registro_ordenes()
+            return handler
 
         def ejecutar():
             if not (estrategia.value and ticker.value and start.value):
@@ -185,60 +253,30 @@ def render_strategy_view():
                         pagination={'rowsPerPage': 10}
                     )
 
-                    for i, señal in enumerate(señales_dicc):
-                        volumen = int(señal.get('volumen', 0))
-                        volumen = min(volumen, 1000)
+                    # Mostrar solo la última señal
+                    ultima_senal = señales_dicc[-1]
+                    volumen_input = ui.number(label='Cantidad a operar', value=min(int(ultima_senal.get('volumen', 0)), 1000))
 
-                        if señal.get('compra'):
-                            with ui.row().classes('items-center gap-4'):
-                                ui.label(f"{i+1}. Recomendación: ✅ COMPRAR {volumen} de {ticker.value.upper()}")
+                    if ultima_senal.get('compra'):
+                        with ui.row().classes('items-center gap-4'):
+                            ui.label(f"📢 Recomendación final: ✅ COMPRAR {ticker.value.upper()}")
+                            ui.button('Ejecutar orden de COMPRA', on_click=lambda: crear_handler_compra({
+                                **ultima_senal,
+                                'volumen': volumen_input.value
+                            })()).props('color=primary')
 
-                                def crear_handler_compra(s=señal):
-                                    async def handler():
-                                        cantidad = min(int(s.get('volumen', 0)), 1000)
-                                        uid = registrar_orden(ticker.value.upper(), "BUY", cantidad)
-                                        resultado = await execute_order(
-                                            symbol=ticker.value.upper(),
-                                            action="BUY",
-                                            quantity=cantidad,
-                                            mode='real'
-                                        )
-                                        # Actualizar estado según resultado
-                                        for o in ordenes_registro:
-                                            if o['id'] == uid:
-                                                o['estado'] = 'ejecutada' if 'Orden' in resultado else 'error'
-                                        ui.notify(resultado, type='success' if 'Orden' in resultado else 'negative')
-                                        actualizar_registro_ordenes()
-                                    return handler
+                    elif ultima_senal.get('venta'):
+                        with ui.row().classes('items-center gap-4'):
+                            ui.label(f"📢 Recomendación final: 🔻 VENDER {ticker.value.upper()}")
+                            ui.button('Ejecutar orden de VENTA', on_click=lambda: crear_handler_venta({
+                                **ultima_senal,
+                                'volumen': volumen_input.value
+                            })()).props('color=negative')
 
-                                ui.button('Ejecutar orden de COMPRA', on_click=crear_handler_compra()).props('color=primary')
+                    else:
+                        with ui.row().classes('items-center gap-4'):
+                            ui.label(f"📢 Recomendación final: 🟡 MANTENER posición en {ticker.value.upper()}")
 
-                        elif señal.get('venta'):
-                            with ui.row().classes('items-center gap-4'):
-                                ui.label(f"{i+1}. Recomendación: 🔻 VENDER {volumen} de {ticker.value.upper()}")
-
-                                def crear_handler_venta(s=señal):
-                                    async def handler():
-                                        cantidad = min(int(s.get('volumen', 0)), 1000)
-                                        uid = registrar_orden(ticker.value.upper(), "SELL", cantidad)
-                                        resultado = await execute_order(
-                                            symbol=ticker.value.upper(),
-                                            action="SELL",
-                                            quantity=cantidad,
-                                            mode='real'
-                                        )
-                                        for o in ordenes_registro:
-                                            if o['id'] == uid:
-                                                o['estado'] = 'ejecutada' if 'Orden' in resultado else 'error'
-                                        ui.notify(resultado, type='success' if 'Orden' in resultado else 'negative')
-                                        actualizar_registro_ordenes()
-                                    return handler
-
-                                ui.button('Ejecutar orden de VENTA', on_click=crear_handler_venta()).props('color=negative')
-
-                        else:
-                            with ui.row().classes('items-center gap-4'):
-                                ui.label(f"{i+1}. Recomendación: 🟡 MANTENER posición en {ticker.value.upper()}")
 
             except Exception as e:
                 output.clear()
