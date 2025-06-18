@@ -890,7 +890,7 @@ class EstrategiaArbitrajeSimulado(EstrategiaBase):
         return pd.DataFrame(señales, columns=COLUMNAS)
 
 #ESTRATEGIA PAIR TRADING(SIMULADA): Largo en un activo, corto en otro correlacionado
-class EstrategiaPairTradingSimulada(EstrategiaBase):
+class EstrategiaPairTrading(EstrategiaBase):
     nombre_interno = "estrategia_pair_trading"
 
     def aplicar(self, df):

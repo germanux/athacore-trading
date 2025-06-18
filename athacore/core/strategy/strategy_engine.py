@@ -1,11 +1,12 @@
 # === IMPORTS Y UTILIDADES ===
 import pandas as pd
 import os
+import re
 
 #Importaciñon de estrategias de "strategy_list"
 from athacore.core.strategy import strategy_list
 from athacore.core.strategy.strategy_list import (
-    EstrategiaBreakout, EstrategiaReversal, EstrategiaRango, EstrategiaDayTrading, EstrategiaNewsTrading, EstrategiaRSI, EstrategiaMACD, EstrategiaMediasSimples, EstrategiaMomentum, EstrategiaScalping, EstrategiaReversionMedia, EstrategiaTendencia, EstrategiaVolume, EstrategiaPriceAction, EstrategiaSwingTrading, EstrategiaPositionTrading, EstrategiaArbitrajeSimulado, EstrategiaPairTradingSimulada,
+    EstrategiaBreakout, EstrategiaReversal, EstrategiaRango, EstrategiaDayTrading, EstrategiaNewsTrading, EstrategiaRSI, EstrategiaMACD, EstrategiaMediasSimples, EstrategiaMomentum, EstrategiaScalping, EstrategiaReversionMedia, EstrategiaTendencia, EstrategiaVolume, EstrategiaPriceAction, EstrategiaSwingTrading, EstrategiaPositionTrading, EstrategiaArbitrajeSimulado, EstrategiaPairTrading,
 )
 from athacore.core.strategy.strategy_base import (load_local_csv, COLUMNAS)
 
@@ -16,12 +17,19 @@ except ImportError:
     from athacore.core.data.market_data_alpha_vantage import get_price_data
 
 #== Mostrar estrategias en el output ==
+def camel_to_snake(name):
+    # Convierte "MACDSignal" en "macd_signal", no "m_a_c_d_signal"
+    name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', name)
+    return name.lower()
+
 def mostrar_estrategias(config=None):
     estrategias = {}
     for nombre in dir(strategy_list):
         clase = getattr(strategy_list, nombre)
         if isinstance(clase, type) and nombre.startswith("Estrategia") and nombre != "EstrategiaBase":
-            clave = f"estrategia_{nombre.replace('Estrategia', '').lower()}"
+            nombre_snake = camel_to_snake(nombre.replace("Estrategia", ""))
+            clave = f"estrategia_{nombre_snake}"
             estrategias[clave] = clase(config)
     return estrategias
 
