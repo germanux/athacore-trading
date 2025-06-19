@@ -2,13 +2,14 @@ from nicegui import ui
 import plotly.graph_objects as go
 from athacore.core.backtesting.backtester import run_backtest
 from athacore.core.strategy.strategy_engine import mostrar_estrategias, run_analysis
+from athacore.core.strategy.strategy_recommend import RECOMENDACIONES
 
 ESTRATEGIAS = list(mostrar_estrategias().keys())
 
 #Listas credas para cada menú de selección. A espera de un estándar
-CANDLE_SIZE_OPTIONS = ["1 minuto", "5 minutos", "15 minutos", "30 minutos", "1 día", "1 semana", "1 mes"]
-EXECUTION_FRECUENCY_OPTIONS =["Con nuevas velas", "Por frecuencia", "Por horario", "Con cambios de mercado", "Manual"]
-SYMBOLS_SUPPORTED_OPTIONS = ["AAPL", "IONQ"]
+CANDLE_SIZE_OPTIONS=["1min", "5min", "15min", "30min", "1d", "1w", "1m"]                                   #Estandarizado según strategy_recommend
+EXECUTION_FRECUENCY_OPTIONS=["on_new_candle", "on_close", "on_event", "on_tick"]                           #Estandarizado según strategy_recommend
+SYMBOLS_SUPPORTED_OPTIONS = ["AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "AMD", "SPY", "QQQ"] # Aún no implementado
 
 visibilidad = False
 
@@ -55,7 +56,7 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_c
             with status_label:
                  ui.label(f'Error: {e}')
 
-def print_config(estrategiaObj, container):
+def print_default_config(estrategiaObj, container):
     try:
         # ui.label(f"Configuracion de f{self.name}")
         container.clear()
@@ -68,7 +69,7 @@ def print_config(estrategiaObj, container):
     except Exception as e:
         print (f"Error al imprimir la configuracion: {e}")
 
-def set_values(estrategiaObj,
+def set_default_values(strategy,
                 candle_size,
                 lookback_period,
                 total_data_needed,
@@ -79,30 +80,41 @@ def set_values(estrategiaObj,
                 symbols_supported,
                 slippage_tolerance):
     
-    dicc_config = estrategiaObj.get_default_config()
-    global SYMBOLS_SUPPORTED_OPTIONS
-    """
-    REFERENCIA DE CONFIGURACIÓN DE ESTRATEGIAS
-    candle_size": "15min",
-    "lookback_period": 14,
-    "total_data_needed": 30,
-    "execution_frequency": "on_new_candle",
-    "signal_delay": 1,
-    "time_filter": {"start": "09:00", "end": "17:00"},
-    "symbols_supported": [],
-    "slippage_tolerance": 0.1
-    """
+    if strategy in RECOMENDACIONES:
+        dicc_config = RECOMENDACIONES[strategy]
 
-    # Esperando estándares para menús desplegables. Se debe dar un valor de un array, por lo que requieren lógica extra.
-    candle_size.value = dicc_config["candle_size"]
-    lookback_period.value = dicc_config["lookback_period"]
-    total_data_needed.value = dicc_config["total_data_needed"]
-    execution_frequency.value = dicc_config["execution_frequency"]
-    signal_delay.value = dicc_config["signal_delay"]
-    time_filter_start.value = dicc_config["time_filter"]["start"]
-    time_filter_end.value = dicc_config["time_filter"]["end"]
-    symbols_supported.autocomplete = dicc_config["symbols_supported"]    #Pendiente de revisión
-    slippage_tolerance.value = dicc_config["slippage_tolerance"]
+        """
+        REFERENCIA DE CONFIGURACIÓN DE ESTRATEGIAS
+        candle_size": "15min",
+        "lookback_period": 14,
+        "total_data_needed": 30,
+        "execution_frequency": "on_new_candle",
+        "signal_delay": 1,
+        "time_filter": {"start": "09:00", "end": "17:00"},
+        "symbols_supported": [],
+        "slippage_tolerance": 0.1
+        """
+
+        # Esperando estándares para menús desplegables. Se debe dar un valor de un array, por lo que requieren lógica extra.
+        candle_size.value = dicc_config["candle_size"]
+        lookback_period.value = dicc_config["lookback_period"]
+        total_data_needed.value = dicc_config["total_data_needed"]
+        execution_frequency.value = dicc_config["execution_frequency"]
+        signal_delay.value = dicc_config["signal_delay"]
+        time_filter_start.value = dicc_config["time_filter"]["start"]
+        time_filter_end.value = dicc_config["time_filter"]["end"]
+        slippage_tolerance.value = dicc_config["slippage_tolerance"]
+        
+        #Pendiente de revisión
+        try:   
+            symbols_supported.options = dicc_config["symbols_supported"]
+            print(f"[BACKTESTING_VIEW]: Simbolos soportados por la estrategia: {dicc_config['symbols_supported']}")
+            print(f"[BACKTESTING_VIEW]: Simpolos del input: {symbols_supported.options}")
+        except Exception as e:
+            print(f"[BACKTESTING_VIEW]: Error al cargar los simbolos soportados: {e}")
+
+    else:
+        ui.notify("No hay configuración recomendada para la estrategia indicada", type="warning")
 
 def ticker_support(ticker, ticker_state):
     if SYMBOLS_SUPPORTED_OPTIONS:
@@ -117,7 +129,6 @@ def input_type_change(value, container_date, container_candle):
     container_date.visible = False
     container_candle.visible = False
 
-    print(value)
     if value == "Por fecha":
         container_date.visible = True
     elif value == "Por velas":
@@ -135,11 +146,15 @@ def render_backtesting_view():
                     label='Selecciona una estrategia',
                     value=ESTRATEGIAS[0])
                 
-                ticker = ui.input('Ticker (ej: AAPL)', autocomplete=SYMBOLS_SUPPORTED_OPTIONS)
+                ticker = ui.select(
+                    options=SYMBOLS_SUPPORTED_OPTIONS,
+                    label="Selecciona un ticker",
+                    with_input=True
+                )
                 ticker_state = ui.label("Esperando entrada de un ticker...")
 
                 initial_cash = ui.input('Dinero inicial')
-                percentage_cash = ui.input('Porcentaje por inversión')
+                percentage_cash = ui.number('Porcentaje por inversión', min=0, max=100)
 
                 ui.label("Tipo de backtesting").classes("font-bold mt-2")
                 
@@ -160,7 +175,8 @@ def render_backtesting_view():
                     candle_size = ui.select(
                         options=CANDLE_SIZE_OPTIONS,
                         label="Tamaño de velas (candle_size)",
-                        value=CANDLE_SIZE_OPTIONS[4])
+                        value=CANDLE_SIZE_OPTIONS[0],
+                        with_input=True)
                         # Inputs que solo son informativos por ahora
                     lookback_period = ui.input("Periodo de análisis por velas (lookback_period)").classes("bg-gray-100")
                     total_data_needed = ui.input("Total de datos necesarios").classes("bg-gray-100")
@@ -171,7 +187,7 @@ def render_backtesting_view():
                 execution_frequency = ui.select(
                     options=EXECUTION_FRECUENCY_OPTIONS,
                     label="Frecuencia de ejecución",
-                    value=EXECUTION_FRECUENCY_OPTIONS[2]
+                    value=EXECUTION_FRECUENCY_OPTIONS[0]
                 )
                 signal_delay = ui.number("Retraso de señal (signal delay)", value=1)
                 ui.label("Horario permitido:")
@@ -187,22 +203,11 @@ def render_backtesting_view():
 
 
             # === LÓGICA ESTRATEGIAS === #
-            print_config(mostrar_estrategias().get(estrategia.value), strategy_data)
+            print_default_config(mostrar_estrategias().get(estrategia.value), strategy_data)
             input_type_change(input_type.value, inputs_by_date, inputs_by_candles)
-
-            estrategiaObj = mostrar_estrategias().get(estrategia.value) # Tomar el objeto estrategia equivalente al de la lista de opciones
-                                                                        # Habra que actualizarlo tambien. Que sea dinámica la variable
+            set_default_values(estrategia.value, candle_size, lookback_period,total_data_needed, execution_frequency, signal_delay, time_filter_start, time_filter_end, ticker, slippage_tolerance)
 
             #Event listeners
-            estrategia.on_value_change(lambda _: print_config(mostrar_estrategias().get(estrategia.value), strategy_data))
-            estrategia.on_value_change(lambda _: set_values(estrategiaObj, 
-                                                        candle_size,
-                                                        lookback_period,
-                                                        total_data_needed,
-                                                        execution_frequency,
-                                                        signal_delay,
-                                                        time_filter_start,
-                                                        time_filter_end,
-                                                        ticker,
-                                                        slippage_tolerance))
+            estrategia.on_value_change(lambda _: print_default_config(mostrar_estrategias().get(estrategia.value), strategy_data))
+            estrategia.on_value_change(lambda _: set_default_values(estrategia.value, candle_size, lookback_period,total_data_needed, execution_frequency, signal_delay, time_filter_start, time_filter_end, ticker, slippage_tolerance))
             ticker.on_value_change(lambda _: ticker_support(ticker.value, ticker_state))
