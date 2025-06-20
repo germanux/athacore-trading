@@ -28,9 +28,8 @@ def mostrar_estrategias(config=None):
     for nombre in dir(strategy_list):
         clase = getattr(strategy_list, nombre)
         if isinstance(clase, type) and nombre.startswith("Estrategia") and nombre != "EstrategiaBase":
-            nombre_snake = camel_to_snake(nombre.replace("Estrategia", ""))
-            clave = f"estrategia_{nombre_snake}"
-            estrategias[clave] = clase(config)
+            instancia = clase(config)
+            estrategias[instancia.nombre_interno] = instancia
     return estrategias
 
 # === FUNCIONALIDAD DE ANÁLISIS ===

@@ -7,7 +7,7 @@ from athacore.core.strategy.strategy_recommend import RECOMENDACIONES
 ESTRATEGIAS = list(mostrar_estrategias().keys())
 
 #Listas credas para cada menú de selección. A espera de un estándar
-CANDLE_SIZE_OPTIONS=["1min", "5min", "15min", "30min", "1d", "1w", "1m"]                                   #Estandarizado según strategy_recommend
+CANDLE_SIZE_OPTIONS=["1min", "5min", "15min", "30min", "1h", "1d", "1w", "1m"]                                   #Estandarizado según strategy_recommend
 EXECUTION_FRECUENCY_OPTIONS=["on_new_candle", "on_close", "on_event", "on_tick"]                           #Estandarizado según strategy_recommend
 SYMBOLS_SUPPORTED_OPTIONS = ["AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "AMD", "SPY", "QQQ"] # Aún no implementado
 
@@ -155,6 +155,11 @@ def render_backtesting_view():
 
                 initial_cash = ui.input('Dinero inicial')
                 percentage_cash = ui.number('Porcentaje por inversión', min=0, max=100)
+                candle_size = ui.select(
+                        options=CANDLE_SIZE_OPTIONS,
+                        label="Tamaño de velas (candle_size)",
+                        value=CANDLE_SIZE_OPTIONS[0],
+                        with_input=True)
 
                 ui.label("Tipo de backtesting").classes("font-bold mt-2")
                 
@@ -172,11 +177,6 @@ def render_backtesting_view():
                     end = ui.input('Fecha fin (YYYY-MM-DD)')
 
                 with inputs_by_candles:
-                    candle_size = ui.select(
-                        options=CANDLE_SIZE_OPTIONS,
-                        label="Tamaño de velas (candle_size)",
-                        value=CANDLE_SIZE_OPTIONS[0],
-                        with_input=True)
                         # Inputs que solo son informativos por ahora
                     lookback_period = ui.input("Periodo de análisis por velas (lookback_period)").classes("bg-gray-100")
                     total_data_needed = ui.input("Total de datos necesarios").classes("bg-gray-100")

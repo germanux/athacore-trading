@@ -201,7 +201,6 @@ class EstrategiaDayTrading(EstrategiaBase):
     def aplicar(self, df):
         lookback = self.config.get("lookback_period", 4)
         if lookback < 3:
-            print(f"⚠️ [DayTrading] El parámetro 'lookback_period' ({lookback}) es muy bajo. Usando valor mínimo recomendado: 3.")
             lookback = 3
             self.config["lookback_period"] = 3
 
@@ -210,12 +209,33 @@ class EstrategiaDayTrading(EstrategiaBase):
         total_minimo = sma_largo + volumen_window
 
         if len(df) < total_minimo:
-            print(f"❌ [DayTrading] Datos insuficientes: se requieren al menos {total_minimo} filas. Actualmente hay: {len(df)}")
+            print(f"❌ [DayTrading] Datos insuficientes: se requieren al menos {total_minimo} filas.")
             return pd.DataFrame(columns=COLUMNAS)
+
+        # Identificar columna de volumen
+        if 'Volume' in df.columns:
+            col_volumen = 'Volume'
+        elif 'Vol.' in df.columns:
+            col_volumen = 'Vol.'
+        else:
+            raise ValueError("❌ El DataFrame no tiene la columna 'Volume' o 'Vol.' de volumen.")
+
+        # Verificar índice de tiempo
+        if not isinstance(df.index, pd.DatetimeIndex):
+            if 'Datetime' in df.columns:
+                df['Datetime'] = pd.to_datetime(df['Datetime'], errors='coerce')
+                df = df.dropna(subset=['Datetime'])
+                df.set_index('Datetime', inplace=True)
+            elif 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                df = df.dropna(subset=['Date'])
+                df.set_index('Date', inplace=True)
+            else:
+                raise ValueError("❌ El DataFrame no tiene la columna 'Date' o 'Datetime' necesaria para usar como índice.")
 
         df['SMA_corta'] = sma(df, lookback)
         df['SMA_larga'] = sma(df, sma_largo)
-        df['Volumen_Medio'] = df['Volume'].rolling(window=volumen_window).mean()
+        df['Volumen_Medio'] = df[col_volumen].rolling(window=volumen_window).mean()
         df['Hora'] = df.index.strftime('%H:%M')
         df = df.dropna(subset=['SMA_corta', 'SMA_larga', 'Volumen_Medio'])
 
@@ -232,57 +252,43 @@ class EstrategiaDayTrading(EstrategiaBase):
         for i in range(sma_largo, len(df)):
             hora_actual = df['Hora'].iloc[i]
             close = df['Close'].iloc[i]
+            volumen = df[col_volumen].iloc[i]
+            volumen_medio = df['Volumen_Medio'].iloc[i]
+            sma_corta = df['SMA_corta'].iloc[i]
+            sma_larga = df['SMA_larga'].iloc[i]
 
-            #Salida por TP/SL o duración máxima
             if posicion_abierta == "compra":
-                if (close >= precio_entrada * (1 + take_profit) or
-                    close <= precio_entrada * (1 - stop_loss) or
-                    i - entrada_index >= 36):
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss) or i - entrada_index >= 36:
                     señales.append(generar_senal(df, i, False))
                     posicion_abierta = None
-                    precio_entrada = None
-                    entrada_index = None
                     continue
 
             elif posicion_abierta == "venta":
-                if (close <= precio_entrada * (1 - take_profit) or
-                    close >= precio_entrada * (1 + stop_loss) or
-                    i - entrada_index >= 36):
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss) or i - entrada_index >= 36:
                     señales.append(generar_senal(df, i, True))
                     posicion_abierta = None
-                    precio_entrada = None
-                    entrada_index = None
                     continue
 
             if not (hora_inicio <= hora_actual <= hora_fin):
                 continue
 
-            sma_corta = df['SMA_corta'].iloc[i]
-            sma_larga = df['SMA_larga'].iloc[i]
-            volumen = df['Volume'].iloc[i]
-            volumen_medio = df['Volumen_Medio'].iloc[i]
-
-            if (sma_corta > sma_larga * 0.99 and
-                close > sma_corta * 0.99 and
-                volumen > volumen_medio * 0.9 and
-                posicion_abierta != "compra"):
+            if sma_corta > sma_larga * 0.99 and close > sma_corta * 0.99 and volumen > volumen_medio * 0.9 and posicion_abierta != "compra":
                 señales.append(generar_senal(df, i, True))
                 posicion_abierta = "compra"
                 precio_entrada = close
                 entrada_index = i
 
-            elif (close < sma_corta * 0.995 and
-                  posicion_abierta != "venta"):
+            elif close < sma_corta * 0.995 and posicion_abierta != "venta":
                 señales.append(generar_senal(df, i, False))
                 posicion_abierta = "venta"
                 precio_entrada = close
                 entrada_index = i
 
         if not señales:
-            print("🔎 [DayTrading] No se generaron señales en el período evaluado.")
+            print("⚠️ No se generaron señales con los datos seleccionados.")
 
         return pd.DataFrame(señales, columns=COLUMNAS)
-
+                
 #ESTRATEGIA NEWS TRADING (SIMULADA): reacción a velas con gran volumen y rango
 class EstrategiaNewsTrading(EstrategiaBase):
     nombre_interno = "estrategia_news_trading"
