@@ -31,9 +31,8 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_c
                 columna_graficas = ui.column()
 
                 with columna_graficas:
+                    columna_graficas.clear()
                     def dibujar_grafica():
-                        columna_graficas.clear()
-
                         fig = go.Figure()
                         fig.add_hline(y=initial_cash, line=dict(color="orange", width=1))
                         fig.add_trace(go.Scatter(
@@ -43,7 +42,7 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_c
                             name='Volumen'
                         ))
                         fig.update_layout(
-                            title=f"Gráfica de {ticker} entre {start} y {end}",
+                            title=f"Grafica de rendimiento al invertir en {ticker} entre el {start} y {end}",
                             xaxis_title="Fecha",
                             yaxis_title="Dinero",
                             xaxis=dict(tickformat="%Y-%m-%d", type="date")
@@ -53,8 +52,8 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_c
                     dibujar_grafica()
 
         except Exception as e:
-            with status_label:
-                 ui.label(f'Error: {e}')
+            ui.notification(f"Error: {e}", type="negative")
+            print(f"[BACKTESTING_VIEW]: Error al ejecutar backtest: {e}")
 
 def print_default_config(estrategiaObj, container):
     try:
@@ -174,13 +173,13 @@ def render_backtesting_view():
                 
                 with inputs_by_date:
                     start = ui.input('Fecha inicio (YYYY-MM-DD)')
-                    end = ui.input('Fecha fin (YYYY-MM-DD)')
 
                 with inputs_by_candles:
                         # Inputs que solo son informativos por ahora
                     lookback_period = ui.input("Periodo de análisis por velas (lookback_period)").classes("bg-gray-100")
                     total_data_needed = ui.input("Total de datos necesarios").classes("bg-gray-100")
-                    end = ui.input('Fecha fin (YYYY-MM-DD)')
+                    
+                end = ui.input('Fecha fin (YYYY-MM-DD)')
 
                 ui.label("Opciones extra").classes("font-bold mt-2")
                 
