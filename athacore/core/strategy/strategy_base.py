@@ -6,7 +6,7 @@ from athacore.core.strategy.strategy_recommend import RECOMENDACIONES
 COLUMNAS = ["indice", "fecha", "volumen", "cierre", "compra"]
 
 def generar_senal(df, i, señal):
-    return df.index[i], df.index[i], df.iloc[i]["Volume"], df.iloc[i]["Close"], señal
+    return df.index[i], df.iloc[i]["Date"], df.iloc[i]["Volume"], df.iloc[i]["Close"], señal
 
 def load_local_csv(ticker, start=None, end=None):
     try:

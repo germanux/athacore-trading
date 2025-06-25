@@ -6,6 +6,8 @@ from datetime import date
 import pandas as pd
 import asyncio
 
+# Lista global para guardar órdenes ejecutadas
+ordenes_ejecutadas = []
 
 def render_strategy_view():
     with ui.card().classes('p-4 w-full'):
@@ -25,22 +27,17 @@ def render_strategy_view():
                 ticker = ui.input('Ticker (ej: AAPL)').props('outlined')
                 start = ui.input('Fecha inicio (YYYY-MM-DD)').props('outlined')
 
-                with ui.expansion("⚙️ Opciones avanzadas", icon="tune"):
-                    candle_size = ui.input("candle_size", placeholder="Ej: 15min")
-                    lookback_period = ui.number("lookback_period")
-                    total_data_needed = ui.number("total_data_needed")
-                    execution_frequency = ui.input("execution_frequency", placeholder="on_new_candle")
-                    signal_delay = ui.number("signal_delay")
-                    time_filter_start = ui.input("time_filter.start", placeholder="09:00")
-                    time_filter_end = ui.input("time_filter.end", placeholder="17:00")
-                    slippage_tolerance = ui.number("slippage_tolerance (%)")
+                candle_size = ui.input("candle_size", placeholder="Ej: 15min")
+                execution_frequency = ui.input("execution_frequency", placeholder="on_new_candle")
+                signal_delay = ui.number("signal_delay")
+                time_filter_start = ui.input("time_filter.start", placeholder="09:00")
+                time_filter_end = ui.input("time_filter.end", placeholder="17:00")
+                slippage_tolerance = ui.number("slippage_tolerance (%)")
 
                 def aplicar_configuracion_recomendada():
                     selected = estrategia.value
                     config = RECOMENDACIONES.get(selected, {})
                     candle_size.value = config.get('candle_size', '')
-                    lookback_period.value = config.get('lookback_period', 0)
-                    total_data_needed.value = config.get('total_data_needed', 0)
                     execution_frequency.value = config.get('execution_frequency', '')
                     signal_delay.value = config.get('signal_delay', 0)
                     time_filter_start.value = config.get('time_filter', {}).get('start', '')
@@ -51,6 +48,48 @@ def render_strategy_view():
                 aplicar_configuracion_recomendada()
 
             output = ui.column().classes("w-2/3")
+
+        # Contenedor para tabla de órdenes
+        registro_div = ui.column().classes("mt-4")
+
+        def actualizar_tabla_ordenes():
+            registro_div.clear()
+            if not ordenes_ejecutadas:
+                with registro_div:
+                    ui.label("📋 No hay órdenes ejecutadas aún.").classes("text-gray-500")
+                return
+
+            with registro_div:
+                ui.label("📋 Registro de órdenes ejecutadas").classes("text-lg font-semibold mb-2")
+                # Construir tabla con botón de cancelar
+                rows = []
+                for i, orden in enumerate(ordenes_ejecutadas):
+                    row = dict(orden)  # copia el dict
+                    row['id'] = i
+                    rows.append(row)
+
+                def cancelar_orden(id: int):
+                    orden = ordenes_ejecutadas.pop(id)
+                    ui.notify(f"❌ Orden cancelada: {orden['accion']} {orden['cantidad']} {orden['simbolo']}")
+                    actualizar_tabla_ordenes()
+
+                def cell_renderer_cancelar(row):
+                    btn = ui.button("Cancelar", color="negative", size="small")
+                    btn.on('click', lambda e: cancelar_orden(row['id']))
+                    return btn
+
+                ui.table(
+                    columns=[
+                        {'name': 'simbolo', 'label': 'Símbolo', 'field': 'simbolo'},
+                        {'name': 'accion', 'label': 'Acción', 'field': 'accion'},
+                        {'name': 'cantidad', 'label': 'Cantidad', 'field': 'cantidad'},
+                        {'name': 'resultado', 'label': 'Resultado', 'field': 'resultado'},
+                        {'name': 'cancelar', 'label': 'Cancelar', 'field': 'cancelar', 'sortable': False},
+                    ],
+                    rows=[{**r, 'cancelar': None} for r in rows],
+                    row_key='id',
+                    render_cell={'cancelar': cell_renderer_cancelar}
+                )
 
         async def ejecutar_orden(tipo, volumen):
             try:
@@ -68,6 +107,15 @@ def render_strategy_view():
             )
             tipo_notif = 'success' if 'Orden ejecutada' in resultado else 'negative'
             ui.notify(resultado, type=tipo_notif)
+
+            # Registrar orden ejecutada
+            ordenes_ejecutadas.append({
+                'simbolo': ticker.value.upper(),
+                'accion': accion,
+                'cantidad': cantidad,
+                'resultado': resultado,
+            })
+            actualizar_tabla_ordenes()
 
         def ejecutar():
             if not (estrategia.value and ticker.value and start.value):
@@ -87,7 +135,7 @@ def render_strategy_view():
                         ui.label('⚠️ No se generaron señales con los datos seleccionados.').classes('text-yellow-600 font-semibold')
                     return
 
-                # Preparar tabla
+                # Preparar tabla de señales
                 for col in señales.columns:
                     if pd.api.types.is_datetime64_any_dtype(señales[col]):
                         señales[col] = señales[col].astype(str)
@@ -141,4 +189,7 @@ def render_strategy_view():
                     ui.label(f'❌ Error al ejecutar la estrategia: {e}').classes('text-red-600 font-bold')
 
         with inputs:
-            ui.button('Ejecutar estrategia', on_click=ejecutar).props('color=secondary')
+            ui.button('Ejecutar estrategia', on_click=ejecutar)
+        
+        # Mostrar tabla de órdenes ejecutadas
+        actualizar_tabla_ordenes()

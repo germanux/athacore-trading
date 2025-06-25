@@ -13,47 +13,66 @@ SYMBOLS_SUPPORTED_OPTIONS = ["AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "NVDA", "M
 
 visibilidad = False
 
-def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_cash, status_label):
-        try:
-            señales = run_analysis(estrategia, ticker, start, end)
+def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_cash, status_label,
+                      candle_size, lookback_period, total_data_needed, execution_frequency,
+                      signal_delay, time_filter_start, time_filter_end, slippage_tolerance):
+    try:
+        # Construcción del diccionario de configuración con los valores del usuario
+        config = {
+            "candle_size": candle_size.value,
+            "lookback_period": int(lookback_period.value) if lookback_period.value else 0,
+            "total_data_needed": int(total_data_needed.value) if total_data_needed.value else 0,
+            "execution_frequency": execution_frequency.value,
+            "signal_delay": int(signal_delay.value) if signal_delay.value else 1,
+            "time_filter": {
+                "start": time_filter_start.value,
+                "end": time_filter_end.value
+            },
+            "slippage_tolerance": float(slippage_tolerance.value) if slippage_tolerance.value else 0.1,
+            "symbols_supported": [ticker] if ticker else [],
+        }
 
-            resultado, diccionario = run_backtest(señales, "compra", initial_cash, percentage_cash)
+        # Ejecutar análisis con la configuración personalizada
+        señales = run_analysis(estrategia, ticker, start, end, config=config)
 
-            #Renderizado
-            status_label.clear()
+        resultado, diccionario = run_backtest(señales, "compra", initial_cash, percentage_cash)
 
-            with status_label:                        
-                ui.table(
-                    columns=[{'name': key, 'label': key.upper(), 'field': key} for key in resultado],
-                    rows=[resultado]
-                )
-                         
-                columna_graficas = ui.column()
+        # Renderizado
+        status_label.clear()
 
-                with columna_graficas:
-                    columna_graficas.clear()
-                    def dibujar_grafica():
-                        fig = go.Figure()
-                        fig.add_hline(y=initial_cash, line=dict(color="orange", width=1))
-                        fig.add_trace(go.Scatter(
-                            x=diccionario["fecha"],
-                            y=diccionario["dinero"],
-                            mode='lines',
-                            name='Volumen'
-                        ))
-                        fig.update_layout(
-                            title=f"Grafica de rendimiento al invertir en {ticker} entre el {start} y {end}",
-                            xaxis_title="Fecha",
-                            yaxis_title="Dinero",
-                            xaxis=dict(tickformat="%Y-%m-%d", type="date")
-                        )
+        with status_label:
+            ui.table(
+                columns=[{'name': key, 'label': key.upper(), 'field': key} for key in resultado],
+                rows=[resultado]
+            )
 
-                        ui.plotly(fig).classes("w-full h-[600px]")
-                    dibujar_grafica()
+            columna_graficas = ui.column()
+            with columna_graficas:
+                columna_graficas.clear()
 
-        except Exception as e:
-            ui.notification(f"Error: {e}", type="negative")
-            print(f"[BACKTESTING_VIEW]: Error al ejecutar backtest: {e}")
+                def dibujar_grafica():
+                    fig = go.Figure()
+                    fig.add_hline(y=initial_cash, line=dict(color="orange", width=1))
+                    fig.add_trace(go.Scatter(
+                        x=diccionario["fecha"],
+                        y=diccionario["dinero"],
+                        mode='lines',
+                        name='Volumen'
+                    ))
+                    fig.update_layout(
+                        title=f"Gráfica de rendimiento al invertir en {ticker} entre el {start} y {end}",
+                        xaxis_title="Fecha",
+                        yaxis_title="Dinero",
+                        xaxis=dict(tickformat="%Y-%m-%d", type="date")
+                    )
+
+                    ui.plotly(fig).classes("w-full h-[600px]")
+
+                dibujar_grafica()
+
+    except Exception as e:
+        ui.notification(f"Error: {e}", type="negative")
+        print(f"[BACKTESTING_VIEW]: Error al ejecutar backtest: {e}")
 
 def print_default_config(estrategiaObj, container):
     try:
@@ -153,7 +172,7 @@ def render_backtesting_view():
                 ticker_state = ui.label("Esperando entrada de un ticker...")
 
                 initial_cash = ui.input('Dinero inicial')
-                percentage_cash = ui.number('Porcentaje por inversión', min=0, max=100)
+                percentage_cash = ui.number('Porcentaje por inversión', min=0, max=100, value=100)
                 candle_size = ui.select(
                         options=CANDLE_SIZE_OPTIONS,
                         label="Tamaño de velas (candle_size)",
@@ -175,11 +194,10 @@ def render_backtesting_view():
                     start = ui.input('Fecha inicio (YYYY-MM-DD)')
 
                 with inputs_by_candles:
-                        # Inputs que solo son informativos por ahora
-                    lookback_period = ui.input("Periodo de análisis por velas (lookback_period)").classes("bg-gray-100")
                     total_data_needed = ui.input("Total de datos necesarios").classes("bg-gray-100")
                     
                 end = ui.input('Fecha fin (YYYY-MM-DD)')
+                lookback_period = ui.input("Periodo de análisis por velas (lookback_period)").classes("bg-gray-100")
 
                 ui.label("Opciones extra").classes("font-bold mt-2")
                 
@@ -195,7 +213,8 @@ def render_backtesting_view():
                     time_filter_end= ui.input("Hora de fin", value="17:00")
                 slippage_tolerance = ui.number("Tolerancia al deslizamiento (%)", min=0, max=100)
          
-                ui.button('Ejecutar Backtest', on_click=lambda:ejecutar_backtest(estrategia.value, ticker.value, start.value, end.value, initial_cash.value, int(percentage_cash.value), output))
+                ui.button('Ejecutar Backtest', on_click=lambda: ejecutar_backtest(estrategia.value, ticker.value, start.value, end.value,    initial_cash.value, int(percentage_cash.value), output,candle_size, lookback_period, total_data_needed, execution_frequency, signal_delay, time_filter_start, time_filter_end, slippage_tolerance))
+                #ui.button('Ejecutar Backtest', on_click=lambda:ejecutar_backtest(estrategia.value, ticker.value, start.value, end.value, initial_cash.value, int(percentage_cash.value), output))
 
             output = ui.column().classes("items-center")
             strategy_data = ui.column().classes('bg-gray-100 p-2 rounded')

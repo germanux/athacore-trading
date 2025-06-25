@@ -15,7 +15,7 @@ async def get_price_data(symbol: str, duration: str = '1d', bar_size: str = '5m'
     if source != 'yfinance':
         raise ValueError("Solo se admite 'yfinance' como fuente de datos en esta versión.")
 
-    return await _get_yfinance_data(symbol, duration, bar_size)
+    return _get_yfinance_data(symbol, duration, bar_size)
 
 async def _get_yfinance_data(symbol: str, duration: str = '1d', bar_size: str = '5m') -> dict:
     ticker = yf.Ticker(symbol)
