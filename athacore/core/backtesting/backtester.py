@@ -6,12 +6,14 @@ def run_backtest(data: pd.DataFrame, signal_column, initial_cash: float = 10000.
 
     if signal_column not in data.columns:
         raise ValueError(f"Falta la columna '{signal_column}' en los datos.")
+    
+    print(f"[BACKTESTER]: Iniciando backtest...\nDataframe recibido con ls columnas: {data.columns}")
 
     cash = float(initial_cash) 
     actions_cuantity = 0
     trades = []
 
-    for i in range(1, len(data)):
+    for i in range(0, len(data)):
         signal = data.iloc[i][signal_column]
         price = data.iloc[i]['cierre']
 

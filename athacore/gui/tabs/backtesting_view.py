@@ -16,6 +16,7 @@ visibilidad = False
 def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_cash, status_label,
                       candle_size, lookback_period, total_data_needed, execution_frequency,
                       signal_delay, time_filter_start, time_filter_end, slippage_tolerance):
+    print(f"[BACKTESTING_VIEW]: Iniciando backtest para la estrategia: {estrategia}")
     try:
         # Construcción del diccionario de configuración con los valores del usuario
         config = {

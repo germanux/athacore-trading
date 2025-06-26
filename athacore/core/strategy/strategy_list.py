@@ -4,6 +4,44 @@ import os
 import matplotlib.pyplot as plt
 
 from athacore.core.strategy.strategy_base import (EstrategiaBase, generar_senal, sma, rsi, macd, COLUMNAS)
+
+#ESTRATEGIA PRUEBAS: Genera señales aleatorias. Creado para comprobar funcionamiento independiente de la lógica de la estrategia
+class EstrategiaPruebasRandom(EstrategiaBase):
+    nombre_interno = "PRUEBAS: Señales generadas al azar"
+
+    def aplicar(self, df):
+        señales = []
+
+        # Generar una compra en la primera fila válida
+        señales.append(generar_senal(df, 0, True))
+
+        for i in range(len(df)):
+        # Generar un número aleatorio y decidir si crear una señal (ajustá la probabilidad)
+            import random
+            if random.random() < 0.5:  # 10% de probabilidad de generar una señal en cada paso
+                señal = random.choice([True, False])  # True = Compra, False = Venta
+                señal_generada = generar_senal(df, i, señal)
+                if señal_generada:
+                    señales.append(señal_generada)
+
+        # Generar una venta en la última fila
+        señales.append(generar_senal(df, len(df) - 1, False))
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+    
+class EstrategiaPruebasPrimeraUltima(EstrategiaBase):
+    nombre_interno = "PRUEBAS: Última señal de compra"
+
+    def aplicar(self, df):
+        señales = []
+        
+        # Generar una compra en la primera fila válida
+        señales.append(generar_senal(df, 0, True))
+        # Generar una venta en la última fila
+        señales.append(generar_senal(df, len(df) - 1, False))
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
 #ESTRATEGIA BREAKOUT: compra si el precio supera la resistencia reciente
 class EstrategiaBreakout(EstrategiaBase):
     nombre_interno = "estrategia_breakout"

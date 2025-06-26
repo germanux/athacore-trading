@@ -6,6 +6,11 @@ from athacore.core.strategy.strategy_recommend import RECOMENDACIONES
 COLUMNAS = ["indice", "fecha", "volumen", "cierre", "compra"]
 
 def generar_senal(df, i, señal):
+    for columna in ["Date", "Volume", "Close"]:
+        if columna not in df.columns:
+            print(f"[GENERAR_SEÑAL]: La columna {columna} no se encuentra en el DataFrame")
+            raise ValueError(f"[GENERAR_SEÑAL]: La columna {columna} no se encuentra en el DataFrame")
+            return None
     return df.index[i], df.iloc[i]["Date"], df.iloc[i]["Volume"], df.iloc[i]["Close"], señal
 
 def load_local_csv(ticker, start=None, end=None):

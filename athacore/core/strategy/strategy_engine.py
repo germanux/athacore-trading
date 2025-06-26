@@ -38,56 +38,53 @@ def mostrar_estrategias(config=None):
     return estrategias
 
 def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=None) -> pd.DataFrame:
-    estrategias = mostrar_estrategias(config)
-    estrategia = estrategias.get(strategy_name)
+    listado_estrategias = mostrar_estrategias(config)
+    estrategia = listado_estrategias.get(strategy_name)
 
     if not estrategia:
         raise NotImplementedError(
             f"Estrategia no implementada: {strategy_name}. "
-            f"Estrategias disponibles: {list(estrategias.keys())}"
+            f"Estrategias disponibles: {list(listado_estrategias.keys())}"
         )
 
     bar_size = estrategia.config.get("candle_size", "15min")
     print(f"[DEBUG] Intervalo solicitado: {bar_size}")
 
-    try:
-        df = get_price_data_twelve(ticker, start_date=start, end_date=end, bar_size=bar_size, api_key=twelve_data_api_key)
-        if df.empty:
-            raise ValueError("Twelve Data no devolvió datos.")
-        print("[STRATEGY_ENGINE]: Datos tomados de Twelve Data")
-    except Exception as e:
-        print(f"[STRATEGY_ENGINE]: Error con Twelve Data: {e}")
+    data_sources = [
+        ("Yahoo Finance", get_price_data_yhfinance, {"config": config}),
+        ("Twelve Data", get_price_data_twelve, {"bar_size": bar_size, "api_key": twelve_data_api_key}),
+        ("Alpha Vantage", get_price_data_alpha_vantage, {}),
+        ("Finnhub", get_price_data_finnhub, {})
+    ]
+
+    # Bucle para probar las distintas fuentes de datos
+    for data_source, market_data_function, extra_kwargs in data_sources:
         try:
-            df = get_price_data_yhfinance(ticker, start_date=start, end_date=end, bar_size=bar_size)
-            if df.empty:
-                raise ValueError("Yahoo Finance falló o no devolvió datos.")
-            print("[STRATEGY_ENGINE]: Datos tomados de YahooFinance")
+            kwargs = {"symbol": ticker, "start_date": start, "end_date": end, **extra_kwargs}   #kwargs es un diccionario de argumentos
+            df = market_data_function(**kwargs)
+            if df is not None and not df.empty:
+                print(f"[STRATEGY_ENGINE]: Datos tomados de {data_source}")
+                break
         except Exception as e:
-            print(f"[STRATEGY_ENGINE]: Error con Yahoo Finance: {e}")
-            try:
-                df = get_price_data_alpha_vantage(ticker, start_date=start, end_date=end)
-                if df.empty:
-                    raise ValueError("Alpha Vantage también falló.")
-                print("[STRATEGY_ENGINE]: Datos tomados de Alpha Vantage")
-            except Exception as e:
-                print(f"[STRATEGY_ENGINE]: Error con Alpha Vantage: {e}")
-                try:
-                    df = get_price_data_finnhub(ticker, start_date=start, end_date=end)
-                    if df.empty:
-                        raise ValueError("Finnhub también falló.")
-                    print("[STRATEGY_ENGINE]: Datos tomados de Finnhub")
-                except Exception as final_e:
-                    print(f"[STRATEGY_ENGINE]: Todas las fuentes fallaron: {final_e}")
-                    print("🔁 Intentando cargar desde CSV local...")
-                    df = load_local_csv(ticker, start, end)
-                    print("📅 Rango de fechas tras carga y filtrado CSV:", df.index.min(), "→", df.index.max())
-                    if df.empty:
-                        return pd.DataFrame()
+            print(f"[STRATEGY_ENGINE]: Error con {data_source}: {e}")
+
+    # Si no hay datos, intentamos cargar desde CSV local
+    if df is None or df.empty:
+        df = load_local_csv(ticker, start, end)
+        if df is not None and not df.empty:
+            print(f"Rango de fechas tras carga y filtrado CSV: {df.index.min()} → {df.index.max()}")
 
     if len(df) < estrategia.config.get("total_data_needed", 0):
         print("⚠️ Datos insuficientes para esta estrategia. Se necesitan al menos",
               estrategia.config["total_data_needed"])
+    
+    if df is not None and not df.empty:
+        print("✅ [STRATEGY_ENGINE]: Estrategia aplicada.")
+        señales = estrategia.aplicar(df)
+        if señales is None or señales.empty:
+            print("⚠️[STRATEGY_ENGINE]: No se creo ninguna señal de compra o venta")
+        print(f"Señales creadas: \n{señales}")
+        return señales
+    else:
+        print("❌ [STRATEGY_ENGINE]: No se pudieron descargar los datos")
         return pd.DataFrame(columns=COLUMNAS)
-
-    print("✅ [STRATEGY_ENGINE]: Estrategia aplicada correctamente")
-    return estrategia.aplicar(df)
