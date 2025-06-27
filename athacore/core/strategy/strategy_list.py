@@ -29,16 +29,25 @@ class EstrategiaPruebasRandom(EstrategiaBase):
 
         return pd.DataFrame(señales, columns=COLUMNAS)
     
-class EstrategiaPruebasPrimeraUltima(EstrategiaBase):
-    nombre_interno = "PRUEBAS: Última señal de compra"
+class EstrategiaCompraVenta(EstrategiaBase):
+    nombre_interno = "PRUEBAS: Señal de compra y venta"
 
     def aplicar(self, df):
         señales = []
         
-        # Generar una compra en la primera fila válida
         señales.append(generar_senal(df, 0, True))
-        # Generar una venta en la última fila
         señales.append(generar_senal(df, len(df) - 1, False))
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+class EstrategiaVentaCompra(EstrategiaBase):
+    nombre_interno = "PRUEBAS ESTRATEGIAS: Última señal de compra"
+
+    def aplicar(self, df):
+        señales = []
+        
+        señales.append(generar_senal(df, len(df) - 1, False))
+        señales.append(generar_senal(df, 0, True))
 
         return pd.DataFrame(señales, columns=COLUMNAS)
 

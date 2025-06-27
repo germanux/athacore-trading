@@ -6,8 +6,8 @@ from datetime import date
 import pandas as pd
 import asyncio
 
-# Lista global para guardar órdenes ejecutadas
-ordenes_ejecutadas = []
+# Lista global para registrar acciones ejecutadas
+registro_ordenes = []
 
 def render_strategy_view():
     with ui.card().classes('p-4 w-full'):
@@ -49,47 +49,28 @@ def render_strategy_view():
 
             output = ui.column().classes("w-2/3")
 
-        # Contenedor para tabla de órdenes
-        registro_div = ui.column().classes("mt-4")
+        ordenes_contenedor = ui.column().classes("mt-4")
 
         def actualizar_tabla_ordenes():
-            registro_div.clear()
-            if not ordenes_ejecutadas:
-                with registro_div:
-                    ui.label("📋 No hay órdenes ejecutadas aún.").classes("text-gray-500")
+            ordenes_contenedor.clear()
+            if not registro_ordenes:
+                ordenes_contenedor.clear()
+                with ordenes_contenedor:
+                    ui.label("📭 No hay órdenes registradas aún.").classes("text-gray-500")
                 return
 
-            with registro_div:
-                ui.label("📋 Registro de órdenes ejecutadas").classes("text-lg font-semibold mb-2")
-                # Construir tabla con botón de cancelar
-                rows = []
-                for i, orden in enumerate(ordenes_ejecutadas):
-                    row = dict(orden)  # copia el dict
-                    row['id'] = i
-                    rows.append(row)
+            with ordenes_contenedor:
+                ui.label("📋 Registro de órdenes ejecutadas").classes("text-lg font-semibold mt-4")
+                for i, orden in enumerate(registro_ordenes):
+                    with ui.row().classes("items-center gap-2"):
+                        ui.label(f"{orden['fecha']} - {orden['accion']} {orden['cantidad']} {orden['ticker']}")
+                        ui.button("Cancelar", on_click=lambda i=i: cancelar_orden(i)).props("color=negative flat dense")
 
-                def cancelar_orden(id: int):
-                    orden = ordenes_ejecutadas.pop(id)
-                    ui.notify(f"❌ Orden cancelada: {orden['accion']} {orden['cantidad']} {orden['simbolo']}")
-                    actualizar_tabla_ordenes()
-
-                def cell_renderer_cancelar(row):
-                    btn = ui.button("Cancelar", color="negative", size="small")
-                    btn.on('click', lambda e: cancelar_orden(row['id']))
-                    return btn
-
-                ui.table(
-                    columns=[
-                        {'name': 'simbolo', 'label': 'Símbolo', 'field': 'simbolo'},
-                        {'name': 'accion', 'label': 'Acción', 'field': 'accion'},
-                        {'name': 'cantidad', 'label': 'Cantidad', 'field': 'cantidad'},
-                        {'name': 'resultado', 'label': 'Resultado', 'field': 'resultado'},
-                        {'name': 'cancelar', 'label': 'Cancelar', 'field': 'cancelar', 'sortable': False},
-                    ],
-                    rows=[{**r, 'cancelar': None} for r in rows],
-                    row_key='id',
-                    render_cell={'cancelar': cell_renderer_cancelar}
-                )
+        def cancelar_orden(index):
+            if 0 <= index < len(registro_ordenes):
+                orden_cancelada = registro_ordenes.pop(index)
+                ui.notify(f"❌ Orden cancelada: {orden_cancelada['accion']} {orden_cancelada['ticker']}")
+                actualizar_tabla_ordenes()
 
         async def ejecutar_orden(tipo, volumen):
             try:
@@ -108,14 +89,14 @@ def render_strategy_view():
             tipo_notif = 'success' if 'Orden ejecutada' in resultado else 'negative'
             ui.notify(resultado, type=tipo_notif)
 
-            # Registrar orden ejecutada
-            ordenes_ejecutadas.append({
-                'simbolo': ticker.value.upper(),
-                'accion': accion,
-                'cantidad': cantidad,
-                'resultado': resultado,
-            })
-            actualizar_tabla_ordenes()
+            if tipo_notif == 'success':
+                registro_ordenes.append({
+                    'fecha': date.today().isoformat(),
+                    'accion': accion,
+                    'ticker': ticker.value.upper(),
+                    'cantidad': cantidad,
+                })
+                actualizar_tabla_ordenes()
 
         def ejecutar():
             if not (estrategia.value and ticker.value and start.value):
@@ -135,7 +116,7 @@ def render_strategy_view():
                         ui.label('⚠️ No se generaron señales con los datos seleccionados.').classes('text-yellow-600 font-semibold')
                     return
 
-                # Preparar tabla de señales
+                # Preparar tabla
                 for col in señales.columns:
                     if pd.api.types.is_datetime64_any_dtype(señales[col]):
                         señales[col] = señales[col].astype(str)
@@ -189,7 +170,5 @@ def render_strategy_view():
                     ui.label(f'❌ Error al ejecutar la estrategia: {e}').classes('text-red-600 font-bold')
 
         with inputs:
-            ui.button('Ejecutar estrategia', on_click=ejecutar)
-        
-        # Mostrar tabla de órdenes ejecutadas
-        actualizar_tabla_ordenes()
+            ui.button('Ejecutar estrategia', on_click=ejecutar).props('color=secondary')
+            actualizar_tabla_ordenes()
