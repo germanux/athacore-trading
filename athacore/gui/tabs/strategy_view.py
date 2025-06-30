@@ -6,8 +6,11 @@ from datetime import date
 import pandas as pd
 import asyncio
 
-# Lista global para registrar acciones ejecutadas
+# Estado global
 registro_ordenes = []
+ordenes_en_progreso = {}
+orden_id_counter = 0
+
 
 def render_strategy_view():
     with ui.card().classes('p-4 w-full'):
@@ -54,25 +57,18 @@ def render_strategy_view():
         def actualizar_tabla_ordenes():
             ordenes_contenedor.clear()
             if not registro_ordenes:
-                ordenes_contenedor.clear()
                 with ordenes_contenedor:
                     ui.label("📭 No hay órdenes registradas aún.").classes("text-gray-500")
                 return
 
             with ordenes_contenedor:
                 ui.label("📋 Registro de órdenes ejecutadas").classes("text-lg font-semibold mt-4")
-                for i, orden in enumerate(registro_ordenes):
+                for orden in registro_ordenes:
                     with ui.row().classes("items-center gap-2"):
-                        ui.label(f"{orden['fecha']} - {orden['accion']} {orden['cantidad']} {orden['ticker']}")
-                        ui.button("Cancelar", on_click=lambda i=i: cancelar_orden(i)).props("color=negative flat dense")
+                        estado = orden.get('estado', 'desconocido')
+                        ui.label(f"{orden['fecha']} - {orden['accion']} {orden['cantidad']} {orden['ticker']} ({estado})")
 
-        def cancelar_orden(index):
-            if 0 <= index < len(registro_ordenes):
-                orden_cancelada = registro_ordenes.pop(index)
-                ui.notify(f"❌ Orden cancelada: {orden_cancelada['accion']} {orden_cancelada['ticker']}")
-                actualizar_tabla_ordenes()
-
-        async def ejecutar_orden(tipo, volumen):
+        async def ejecutar_orden_async(orden_id, tipo, volumen):
             try:
                 cantidad = min(int(volumen), 1000)
             except (ValueError, TypeError):
@@ -80,23 +76,52 @@ def render_strategy_view():
                 return
 
             accion = "BUY" if tipo == "compra" else "SELL"
-            resultado = await execute_order(
-                symbol=ticker.value.upper(),
-                action=accion,
-                quantity=cantidad,
-                mode='real'
-            )
-            tipo_notif = 'success' if 'Orden ejecutada' in resultado else 'negative'
-            ui.notify(resultado, type=tipo_notif)
 
-            if tipo_notif == 'success':
-                registro_ordenes.append({
-                    'fecha': date.today().isoformat(),
-                    'accion': accion,
-                    'ticker': ticker.value.upper(),
-                    'cantidad': cantidad,
-                })
-                actualizar_tabla_ordenes()
+            try:
+                resultado = await asyncio.wait_for(
+                    execute_order(
+                        symbol=ticker.value.upper(),
+                        action=accion,
+                        quantity=cantidad,
+                        mode='real'
+                    ),
+                    timeout=5  # Tiempo máximo: 5 segundos
+                )
+
+                tipo_notif = 'success' if 'Orden ejecutada' in resultado else 'negative'
+                ui.notify(resultado, type=tipo_notif)
+
+                for orden in registro_ordenes:
+                    if orden['id'] == orden_id:
+                        orden['estado'] = 'completado' if tipo_notif == 'success' else 'fallida'
+                        break
+
+            except asyncio.TimeoutError:
+                ui.notify("⚠️ Tiempo excedido: la orden fue cancelada automáticamente", type='warning')
+                for orden in registro_ordenes:
+                    if orden['id'] == orden_id:
+                        orden['estado'] = 'cancelada'
+                        break
+
+            ordenes_en_progreso.pop(orden_id, None)
+            actualizar_tabla_ordenes()
+
+        def lanzar_ejecucion(tipo, volumen):
+            global orden_id_counter
+            orden_id = orden_id_counter
+            orden_id_counter += 1
+
+            registro_ordenes.append({
+                'id': orden_id,
+                'fecha': date.today().isoformat(),
+                'accion': tipo.upper(),
+                'ticker': ticker.value.upper(),
+                'cantidad': volumen,
+            })
+
+            task = asyncio.create_task(ejecutar_orden_async(orden_id, tipo, volumen))
+            ordenes_en_progreso[orden_id] = task
+            actualizar_tabla_ordenes()
 
         def ejecutar():
             if not (estrategia.value and ticker.value and start.value):
@@ -116,7 +141,6 @@ def render_strategy_view():
                         ui.label('⚠️ No se generaron señales con los datos seleccionados.').classes('text-yellow-600 font-semibold')
                     return
 
-                # Preparar tabla
                 for col in señales.columns:
                     if pd.api.types.is_datetime64_any_dtype(señales[col]):
                         señales[col] = señales[col].astype(str)
@@ -148,10 +172,10 @@ def render_strategy_view():
                     volumen_input = ui.number(label='Cantidad a operar', value=min(int(ultima_senal.get('volumen', 0)), 1000))
 
                     async def ejecutar_compra():
-                        await ejecutar_orden("compra", volumen_input.value)
+                        lanzar_ejecucion("compra", volumen_input.value)
 
                     async def ejecutar_venta():
-                        await ejecutar_orden("venta", volumen_input.value)
+                        lanzar_ejecucion("venta", volumen_input.value)
 
                     if ultima_senal.get('compra'):
                         with ui.row().classes('items-center gap-4'):
