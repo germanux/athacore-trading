@@ -664,7 +664,7 @@ class EstrategiaReversionMedia(EstrategiaBase):
 
         for i in range(1, len(df)):
             close = df['Close'].iloc[i]
-            sma = df['SMA_20'].iloc[i]
+            sma20 = df['SMA_20'].iloc[i]
             rsi_val = df['RSI'].iloc[i]
 
             #Cierre de posición por TP o SL
@@ -684,13 +684,13 @@ class EstrategiaReversionMedia(EstrategiaBase):
 
             #Señales de entrada 
             #COMPRA: muy por debajo de la media y en sobreventa
-            if (close < sma * 0.97 and rsi_val < 30 and posicion_abierta != "compra"):
+            if (close < sma20 * 0.97 and rsi_val < 30 and posicion_abierta != "compra"):
                 señales.append(generar_senal(df, i, True))
                 posicion_abierta = "compra"
                 precio_entrada = close
 
             #VENTA: muy por encima de la media y en sobrecompra
-            elif (close > sma * 1.03 and rsi_val > 70 and posicion_abierta != "venta"):
+            elif (close > sma20 * 1.03 and rsi_val > 70 and posicion_abierta != "venta"):
                 señales.append(generar_senal(df, i, False))
                 posicion_abierta = "venta"
                 precio_entrada = close
