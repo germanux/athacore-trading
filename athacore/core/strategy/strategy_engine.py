@@ -34,7 +34,8 @@ def mostrar_estrategias(config=None):
         clase = getattr(strategy_list, nombre)
         if isinstance(clase, type) and nombre.startswith("Estrategia") and nombre != "EstrategiaBase":
             instancia = clase(config)
-            estrategias[instancia.nombre_interno] = instancia
+            if getattr(instancia, "operativa", True):
+                estrategias[instancia.nombre_interno] = instancia
     return estrategias
 
 def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=None) -> pd.DataFrame:
@@ -52,17 +53,27 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=N
 
     data_sources = [
         ("Yahoo Finance", get_price_data_yhfinance, {"config": config}),
-        ("Twelve Data", get_price_data_twelve, {"bar_size": bar_size, "api_key": twelve_data_api_key}),
-        ("Alpha Vantage", get_price_data_alpha_vantage, {}),
-        ("Finnhub", get_price_data_finnhub, {})
+        #("Finnhub", get_price_data_finnhub, {}),
+        #("Alpha Vantage", get_price_data_alpha_vantage, {}),
+        #("Twelve Data", get_price_data_twelve, {"bar_size": bar_size, "api_key": twelve_data_api_key})
+        
     ]
 
     # Bucle para probar las distintas fuentes de datos
     for data_source, market_data_function, extra_kwargs in data_sources:
         try:
-            kwargs = {"symbol": ticker, "start_date": start, "end_date": end, **extra_kwargs}   #kwargs es un diccionario de argumentos
-            df = market_data_function(**kwargs)
-            if df is not None and not df.empty:
+            kwargs = {"symbol": ticker, "start_date": start, "end_date": end, **extra_kwargs}
+            result = market_data_function(**kwargs)
+            if isinstance(result, tuple):
+                df, metadata = result
+            elif isinstance(result, pd.DataFrame):
+                df, metadata = result, None
+            else:
+                print(f"[MARKET_DATA]: Valor de retorno inesperado: {type(result)}")
+                df, metadata = None, None
+
+            print(f"[MARKET_DATA]: Tipos de variable: df: {type(df)}, metadata: {type(metadata)}")
+            if isinstance(df, pd.DataFrame) and not df.empty:
                 print(f"[STRATEGY_ENGINE]: Datos tomados de {data_source}")
                 break
         except Exception as e:
@@ -79,12 +90,14 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=N
               estrategia.config["total_data_needed"])
     
     if df is not None and not df.empty:
-        print("✅ [STRATEGY_ENGINE]: Estrategia aplicada.")
-        señales = estrategia.aplicar(df)
+        print("✅ [STRATEGY_ENGINE]: Se descargaróon los datos correctamente")
+        dicc_señales = estrategia.aplicar(df, metadata)
+        señales = dicc_señales["señales"]
+
         if señales is None or señales.empty:
             print("⚠️[STRATEGY_ENGINE]: No se creo ninguna señal de compra o venta")
         print(f"Señales creadas: \n{señales}")
-        return señales
+        return dicc_señales
     else:
         print("❌ [STRATEGY_ENGINE]: No se pudieron descargar los datos")
         return pd.DataFrame(columns=COLUMNAS)

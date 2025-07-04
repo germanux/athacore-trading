@@ -14,7 +14,21 @@ def get_price_data(symbol: str, start_date: str, end_date: str, config: dict=Non
 
     df.rename(columns={'Datetime': 'Date'}, inplace=True)
     print(f"[MARKET_DATA_YHFINANCE]: Datos descargados: \n{df.head()}")
-    return df
+
+    metadata = {
+        "market_data":{
+            "source": "yhfinance",
+            "symbol": symbol,
+            #"name": company_name,
+            #"exchange": info.get('exchange', 'N/A'),
+            #"currency": info.get('currency', 'USD'),
+            #"secType": info.get('quoteType', 'stock'),
+            "start_date": start_date,
+            "end_date": end_date,
+            "config": config,
+            "df_info": df.info()
+        }}
+    return df, metadata
 
 # Mapeo de los valores que pasamos desde la interfaz a los aceptados por yh finance
 format_map = {

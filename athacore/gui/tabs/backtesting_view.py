@@ -33,8 +33,11 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_c
             "symbols_supported": [ticker] if ticker else [],
         }
 
-        señales = run_analysis(estrategia, ticker, start, end, config=config)
-        resultado, diccionario = run_backtest(señales, "compra", initial_cash, percentage_cash)
+        dicc_señales = run_analysis(estrategia, ticker, start, end, config=config)
+        señales = dicc_señales["señales"]
+        print("SEÑALES AJUFDKWJSBDKJSADKJBASJKDBASJKDBAS")
+        print(señales)
+        resultado, diccionario = run_backtest(señales["señales"], "compra", initial_cash, percentage_cash)
 
         status_label.clear()
 
@@ -79,11 +82,23 @@ def print_default_config(estrategiaObj, container):
     try:
         container.clear()
         with container:
-            ui.label(f"Configuracion de la estrategia seleccionada").classes("font-bold")
-            with ui.list().props('dense separator'):
-                for parametro, valor in estrategiaObj.get_default_config().items():
-                    if valor:
+            ui.label(f"DATOS DE LA ESTRATEGIA {estrategiaObj.nombre_interno}").classes('font-bold') if estrategiaObj.nombre_interno else None
+
+            try:
+                with  ui.list().props('dense separator'):
+                    if estrategiaObj.descripcion:
+                        ui.item(f"Descripción: {estrategiaObj.descripcion}")
+                    for parametro, valor in estrategiaObj.atributos.items():
                         ui.item(f"{parametro.upper()}: {valor}")
+            except:
+                pass
+
+            with ui.column().classes('bg-gray-100 p-2 rounded'):
+                ui.label(f"Configuracion de la estrategia seleccionada").classes("font-bold")
+                with ui.list().props('dense separator'):
+                    for parametro, valor in estrategiaObj.get_default_config().items():
+                        if valor:
+                            ui.item(f"{parametro.upper()}: {valor}")
     except Exception as e:
         print(f"Error al imprimir la configuracion: {e}")
 
@@ -193,9 +208,12 @@ def render_backtesting_view():
 
                 slippage_tolerance = ui.number("Tolerancia al deslizamiento (%)", min=0, max=100)
 
-                output = ui.column().classes("items-center")
+            output = ui.column().classes("items-center")
+            
+            with ui.column():
                 errores_output = ui.column().classes("text-red-600 p-2")  # 🔧 NUEVO
 
+                strategy_data = ui.column().classes("w-1/4")
                 ui.button(
                     'Ejecutar Backtest',
                     on_click=lambda: ejecutar_backtest(
@@ -205,10 +223,7 @@ def render_backtesting_view():
                         execution_frequency, signal_delay,
                         time_filter_start, time_filter_end, slippage_tolerance,
                         errores_output  # 🔧 NUEVO
-                    )
-                )
-
-            strategy_data = ui.column().classes('bg-gray-100 p-2 rounded')
+                    ))
 
             print_default_config(mostrar_estrategias().get(estrategia.value), strategy_data)
             input_type_change(input_type.value, inputs_by_date, inputs_by_candles)

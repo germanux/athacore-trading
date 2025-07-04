@@ -8,8 +8,9 @@ from athacore.core.strategy.strategy_base import (EstrategiaBase, generar_senal,
 #ESTRATEGIA PRUEBAS: Genera señales aleatorias. Creado para comprobar funcionamiento independiente de la lógica de la estrategia
 class EstrategiaPruebasRandom(EstrategiaBase):
     nombre_interno = "PRUEBAS: Señales generadas al azar"
+    operativa = True
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         señales = []
 
         # Generar una compra en la primera fila válida
@@ -18,7 +19,7 @@ class EstrategiaPruebasRandom(EstrategiaBase):
         for i in range(len(df)):
         # Generar un número aleatorio y decidir si crear una señal (ajustá la probabilidad)
             import random
-            if random.random() < 0.5:  # 10% de probabilidad de generar una señal en cada paso
+            if random.random() < 0.5: 
                 señal = random.choice([True, False])  # True = Compra, False = Venta
                 señal_generada = generar_senal(df, i, señal)
                 if señal_generada:
@@ -27,35 +28,61 @@ class EstrategiaPruebasRandom(EstrategiaBase):
         # Generar una venta en la última fila
         señales.append(generar_senal(df, len(df) - 1, False))
 
-        return pd.DataFrame(señales, columns=COLUMNAS)
-    
+        """
+        metadata["strategy"]{
+            "nombre": nombre_interno
+        }
+        """
+        return {
+            "df": df,
+            "señales":pd.DataFrame(señales, columns=COLUMNAS),
+            "metadata": metadata}
+
 class EstrategiaCompraVenta(EstrategiaBase):
     nombre_interno = "PRUEBAS: Señal de compra y venta"
+    operativa = True
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         señales = []
         
         señales.append(generar_senal(df, 0, True))
         señales.append(generar_senal(df, len(df) - 1, False))
 
-        return pd.DataFrame(señales, columns=COLUMNAS)
+        return {
+            "df": df,
+            "señales":pd.DataFrame(señales, columns=COLUMNAS),
+            "metadata": metadata}
 
 class EstrategiaVentaCompra(EstrategiaBase):
     nombre_interno = "PRUEBAS ESTRATEGIAS: Última señal de compra"
+    operativa = True
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         señales = []
         
         señales.append(generar_senal(df, len(df) - 1, False))
         señales.append(generar_senal(df, 0, True))
 
-        return pd.DataFrame(señales, columns=COLUMNAS)
+        return {
+            "df": df,
+            "señales":pd.DataFrame(señales, columns=COLUMNAS),
+            "metadata": metadata}
 
 #ESTRATEGIA BREAKOUT: compra si el precio supera la resistencia reciente
 class EstrategiaBreakout(EstrategiaBase):
     nombre_interno = "estrategia_breakout"
+    
+    descripcion = ("Compra cuando el precio rompe una resistencia con volumen y vende al romper soporte o alcanzar límites de riesgo.")
+    
+    atributos = {
+        "riesgo": "Alto — puede experimentar movimientos bruscos, adecuado para traders agresivos.",
+        "frecuencia": "Media — genera señales con moderada regularidad, evitando sobreoperar.",
+        "robustez": "Moderada — sensible a mercados muy volátiles o laterales.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas varias horas o días.",
+    }
+    operativa = True
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         #Parámetros con valores por defecto
         ventana_breakout = self.config.get("ventana_breakout", 20)
         take_profit = self.config.get("take_profit", 0.03)
@@ -124,13 +151,18 @@ class EstrategiaBreakout(EstrategiaBase):
                 precio_entrada = close
                 entrada_index = i
 
-        return pd.DataFrame(señales, columns=COLUMNAS)
+        return {
+            "df": df,
+            "señales":pd.DataFrame(señales, columns=COLUMNAS),
+            "metadata": metadata}
 
 #ESTRATEGIA REVERSAL: compra si hay reversión tras caída
 class EstrategiaReversal(EstrategiaBase):
     nombre_interno = "estrategia_reversal"
 
-    def aplicar(self, df):
+    operativa = False
+
+    def aplicar(self, df, metadata=None):
         df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
         df['SMA_200'] = sma(df, 200)
         df = df.dropna(subset=['RSI', 'SMA_200'])
@@ -198,8 +230,9 @@ class EstrategiaReversal(EstrategiaBase):
 #ESTRATEGIA RANGE TRADING
 class EstrategiaRango(EstrategiaBase):
     nombre_interno = "estrategia_rango"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['min_10'] = df['Close'].rolling(window=10).min()
         df['max_10'] = df['Close'].rolling(window=10).max()
         df['SMA_200'] = sma(df, 200)
@@ -244,8 +277,10 @@ class EstrategiaRango(EstrategiaBase):
 #ESTRATEGIA DAY TRADING: entradas rápidas, busca variaciones intradía
 class EstrategiaDayTrading(EstrategiaBase):
     nombre_interno = "estrategia_day_trading"
+    operativa = False
 
-    def aplicar(self, df):
+
+    def aplicar(self, df, metadata=None):
         lookback = self.config.get("lookback_period", 4)
         if lookback < 3:
             lookback = 3
@@ -339,8 +374,10 @@ class EstrategiaDayTrading(EstrategiaBase):
 #ESTRATEGIA NEWS TRADING (SIMULADA): reacción a velas con gran volumen y rango
 class EstrategiaNewsTrading(EstrategiaBase):
     nombre_interno = "estrategia_news_trading"
+    operativa = False
 
-    def aplicar(self, df):
+
+    def aplicar(self, df, metadata=None):
         df['rango'] = df['Close'].pct_change().abs()
         df['volumen_relativo'] = df['Volume'] / df['Volume'].rolling(20).mean()
         df['SMA_10'] = sma(df, 10)
@@ -391,8 +428,9 @@ class EstrategiaNewsTrading(EstrategiaBase):
 #ESTRATEGIA RSI SIMPLE: puntos de sobrecompra y sobreventa.
 class EstrategiaRSI(EstrategiaBase):
     nombre_interno = "estrategia_rsi_simple"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
         df['SMA_200'] = sma(df, 200)
         df['Volumen_Medio'] = df['Volume'].rolling(window=20).mean()
@@ -450,7 +488,9 @@ class EstrategiaRSI(EstrategiaBase):
 #ESTRATEGIA MACD: cruce de líneas MACD y señal.
 class EstrategiaMACD(EstrategiaBase):
     nombre_interno = "estrategia_macd_cruce"
-    def aplicar(self, df):
+    operativa = False
+    
+    def aplicar(self, df, metadata=None):
         macd_df = macd(df)
         df['macd_line'] = macd_df['macd_line']
         df['signal_line'] = macd_df['signal_line']
@@ -465,8 +505,9 @@ class EstrategiaMACD(EstrategiaBase):
 #ESTRATEGIA BÁSICA DE MEDIAS: cruce de medias móviles simples.
 class EstrategiaMediasSimples(EstrategiaBase):
     nombre_interno = "estrategia_basica_medias"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['SMA_short'] = sma(df, 5)
         df['SMA_long'] = sma(df, 20)
         df['Volumen_Prom'] = df['Volume'].rolling(10).mean()
@@ -530,8 +571,9 @@ class EstrategiaMediasSimples(EstrategiaBase):
 #MOMENTUM: fuerza de precio y volumen como señales de entrada y salida.
 class EstrategiaMomentum(EstrategiaBase):
     nombre_interno = "estrategia_momentum"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['SMA_20'] = sma(df, 20)
         df['SMA_50'] = sma(df, 50)
         df['SMA_200'] = sma(df, 200)
@@ -590,8 +632,9 @@ class EstrategiaMomentum(EstrategiaBase):
 #SCALPING: entradas y salidas rápidas basadas en cruce de media muy corta.
 class EstrategiaScalping(EstrategiaBase):
     nombre_interno = "estrategia_scalping"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['SMA_5'] = sma(df, 5)
         df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
         df['Volumen_Medio'] = df['Volume'].rolling(window=20).mean()
@@ -648,8 +691,9 @@ class EstrategiaScalping(EstrategiaBase):
 #MEAN REVERSION: se basa en que el precio vuelve a su media tras alejarse.
 class EstrategiaReversionMedia(EstrategiaBase):
     nombre_interno = "estrategia_reversion_media"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['SMA_20'] = sma(df, 20)
         df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
         df = df.dropna(subset=['SMA_20', 'RSI'])
@@ -700,8 +744,9 @@ class EstrategiaReversionMedia(EstrategiaBase):
 #TREND FOLLOWING: detecta tendencias sostenidas basadas en medias de 50 y 200.
 class EstrategiaTendencia(EstrategiaBase):
     nombre_interno = "estrategia_seguimiento_tendencia"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['SMA_50'] = sma(df, 50)
         df['SMA_200'] = sma(df, 200)
         señales = []
@@ -727,8 +772,9 @@ class EstrategiaTendencia(EstrategiaBase):
 #ESTRATEGIA VOLUME: Detecta aumentos inusuales de volumen
 class EstrategiaVolume(EstrategiaBase):
     nombre_interno = "estrategia_volume"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['Volumen_Medio'] = df['Volume'].rolling(window=20).mean()
         df = df.dropna(subset=['Volumen_Medio'])
         señales = []
@@ -751,8 +797,9 @@ class EstrategiaVolume(EstrategiaBase):
 #ESTRATEGIA PRICE ACTION: Simulación simple basada en velas alcistas/bajistas
 class EstrategiaPriceAction(EstrategiaBase):
     nombre_interno = "estrategia_price_action"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
         df['SMA_50'] = sma(df, 50)
         df['SMA_200'] = sma(df, 200)
@@ -811,8 +858,9 @@ class EstrategiaPriceAction(EstrategiaBase):
 #ESTRATEGIA SWING TRADING: Mantener posición de pocos días hasta semanas
 class EstrategiaSwingTrading(EstrategiaBase):
     nombre_interno = "estrategia_swing_trading"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['SMA_10'] = sma(df, 10)
         df['SMA_30'] = sma(df, 30)
         df = df.dropna(subset=['SMA_10', 'SMA_30'])
@@ -842,8 +890,9 @@ class EstrategiaSwingTrading(EstrategiaBase):
 #ESTRATEGIA POSITION TRADING: Mantener largos periodos si hay confirmación técnica
 class EstrategiaPositionTrading(EstrategiaBase):
     nombre_interno = "estrategia_position_trading"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         df['SMA_100'] = sma(df, 100)
         df['SMA_200'] = sma(df, 200)
         df = df.dropna(subset=['SMA_100', 'SMA_200'])
@@ -891,8 +940,9 @@ class EstrategiaPositionTrading(EstrategiaBase):
 #ESTRATEGIA ARBITRAGE(SIMULADA): Detecta diferencia de precios entre dos activos
 class EstrategiaArbitrajeSimulado(EstrategiaBase):
     nombre_interno = "estrategia_arbitraje_simulado"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         # Simular la columna 'Close_B' si no existe
         if 'Close_B' not in df.columns:
             print("⚠️ Simulando columna 'Close_B' para pruebas.")
@@ -945,8 +995,9 @@ class EstrategiaArbitrajeSimulado(EstrategiaBase):
 #ESTRATEGIA PAIR TRADING(SIMULADA): Largo en un activo, corto en otro correlacionado
 class EstrategiaPairTrading(EstrategiaBase):
     nombre_interno = "estrategia_pair_trading"
+    operativa = False
 
-    def aplicar(self, df):
+    def aplicar(self, df, metadata=None):
         if 'Close_B' not in df.columns:
             print("⚠️ Pair Trading requiere columna 'Close_B'. Simulando con Close desplazado.")
             df['Close_B'] = df['Close'].shift(1) * (1 + 0.001)
