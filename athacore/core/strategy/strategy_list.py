@@ -160,7 +160,15 @@ class EstrategiaBreakout(EstrategiaBase):
 class EstrategiaReversal(EstrategiaBase):
     nombre_interno = "estrategia_reversal"
 
-    operativa = False
+    descripcion = "Compra cuando el precio rompe una resistencia con volumen y vende al romper soporte o alcanzar límites de riesgo."
+
+    atributos = {
+        "riesgo": "Alto — puede experimentar movimientos bruscos, adecuado para traders agresivos.",
+        "frecuencia": "Media — genera señales con moderada regularidad, evitando sobreoperar.",
+        "robustez": "Moderada — sensible a mercados muy volátiles o laterales.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas varias horas o días.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
@@ -230,7 +238,16 @@ class EstrategiaReversal(EstrategiaBase):
 #ESTRATEGIA RANGE TRADING
 class EstrategiaRango(EstrategiaBase):
     nombre_interno = "estrategia_rango"
-    operativa = False
+
+    descripcion = "Compra en soporte y vende en resistencia dentro de un rango lateral, aprovechando rebotes hasta que el precio rompa el rango."
+
+    atributos = {
+        "riesgo": "Moderado — riesgo de rupturas falsas y movimientos bruscos fuera del rango.",
+        "frecuencia": "Alta — múltiples oportunidades en mercados laterales o con poca tendencia.",
+        "robustez": "Moderada — menos efectiva en mercados con tendencias fuertes o alta volatilidad.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde minutos hasta varios días.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['min_10'] = df['Close'].rolling(window=10).min()
@@ -277,7 +294,16 @@ class EstrategiaRango(EstrategiaBase):
 #ESTRATEGIA DAY TRADING: entradas rápidas, busca variaciones intradía
 class EstrategiaDayTrading(EstrategiaBase):
     nombre_interno = "estrategia_day_trading"
-    operativa = False
+
+    descripcion = "Operar comprando y vendiendo dentro del mismo día, aprovechando movimientos intradía y evitando mantener posiciones abiertas de un día para otro."
+
+    atributos = {
+        "riesgo": "Alto — expuesto a volatilidad intradía y movimientos rápidos.",
+        "frecuencia": "Alta — múltiples operaciones diarias, requiere atención constante.",
+        "robustez": "Moderada — depende de buena ejecución y control emocional.",
+        "horizonte": "Muy corto plazo — posiciones abiertas desde segundos hasta horas dentro del mismo día.",
+    }   
+    operativa = True
 
 
     def aplicar(self, df, metadata=None):
@@ -374,7 +400,16 @@ class EstrategiaDayTrading(EstrategiaBase):
 #ESTRATEGIA NEWS TRADING (SIMULADA): reacción a velas con gran volumen y rango
 class EstrategiaNewsTrading(EstrategiaBase):
     nombre_interno = "estrategia_news_trading"
-    operativa = False
+
+    descripcion = "Operar basado en la reacción rápida a noticias económicas o eventos que impactan el mercado, aprovechando la volatilidad inmediata."
+
+    atributos = {
+        "riesgo": "Alto — movimientos impredecibles y volátiles, requiere gestión estricta.",
+        "frecuencia": "Variable — depende del calendario económico y eventos relevantes.",
+        "robustez": "Baja a moderada — puede ser afectada por rumores o noticias inesperadas.",
+        "horizonte": "Muy corto a corto plazo — desde segundos hasta horas después del evento.",
+    }
+    operativa = True
 
 
     def aplicar(self, df, metadata=None):
@@ -428,7 +463,15 @@ class EstrategiaNewsTrading(EstrategiaBase):
 #ESTRATEGIA RSI SIMPLE: puntos de sobrecompra y sobreventa.
 class EstrategiaRSI(EstrategiaBase):
     nombre_interno = "estrategia_rsi_simple"
-    operativa = False
+    descripcion = "Comprar cuando el RSI indica sobreventa (por ejemplo, <30) y vender cuando indica sobrecompra (por ejemplo, >70), aprovechando reversiones de corto plazo."
+
+    atributos = {
+        "riesgo": "Moderado — puede generar señales falsas en mercados con tendencia fuerte.",
+        "frecuencia": "Media — señales regulares según los niveles de sobrecompra y sobreventa.",
+        "robustez": "Moderada — funciona mejor en mercados laterales o con oscilaciones claras.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
@@ -488,7 +531,15 @@ class EstrategiaRSI(EstrategiaBase):
 #ESTRATEGIA MACD: cruce de líneas MACD y señal.
 class EstrategiaMACD(EstrategiaBase):
     nombre_interno = "estrategia_macd_cruce"
-    operativa = False
+    descripcion = "Comprar cuando la línea MACD cruza por encima de la línea de señal y vender cuando cruza por debajo, identificando cambios en el momentum."
+
+    atributos = {
+        "riesgo": "Moderado — puede generar señales tardías en mercados muy volátiles.",
+        "frecuencia": "Media — ofrece señales regulares, pero no en exceso.",
+        "robustez": "Moderada — funciona bien en tendencias claras, menos efectivo en mercados laterales.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
     
     def aplicar(self, df, metadata=None):
         macd_df = macd(df)
@@ -505,7 +556,15 @@ class EstrategiaMACD(EstrategiaBase):
 #ESTRATEGIA BÁSICA DE MEDIAS: cruce de medias móviles simples.
 class EstrategiaMediasSimples(EstrategiaBase):
     nombre_interno = "estrategia_basica_medias"
-    operativa = False
+    descripcion = "Comprar cuando la media móvil rápida cruza por encima de la media móvil lenta y vender cuando cruza por debajo, siguiendo la tendencia del mercado."
+
+    atributos = {
+        "riesgo": "Moderado — puede producir señales falsas en mercados laterales.",
+        "frecuencia": "Media — señales regulares basadas en cruces de medias.",
+        "robustez": "Moderada — efectiva en tendencias definidas, menos en rangos.",
+        "horizonte": "Medio plazo — posiciones mantenidas desde días hasta semanas.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['SMA_short'] = sma(df, 5)
@@ -571,7 +630,15 @@ class EstrategiaMediasSimples(EstrategiaBase):
 #MOMENTUM: fuerza de precio y volumen como señales de entrada y salida.
 class EstrategiaMomentum(EstrategiaBase):
     nombre_interno = "estrategia_momentum"
-    operativa = False
+    descripcion = "Comprar cuando el momentum (velocidad del movimiento del precio) es fuerte y positivo, y vender cuando muestra debilidad o reversión, aprovechando la continuidad de la tendencia."
+
+    atributos = {
+        "riesgo": "Moderado — puede generar señales falsas en cambios abruptos o mercados laterales.",
+        "frecuencia": "Media — señales con frecuencia moderada basadas en la fuerza del movimiento.",
+        "robustez": "Moderada — funciona mejor en mercados con tendencias claras.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['SMA_20'] = sma(df, 20)
@@ -632,7 +699,15 @@ class EstrategiaMomentum(EstrategiaBase):
 #SCALPING: entradas y salidas rápidas basadas en cruce de media muy corta.
 class EstrategiaScalping(EstrategiaBase):
     nombre_interno = "estrategia_scalping"
-    operativa = False
+    descripcion = "Realizar múltiples operaciones rápidas con pequeños objetivos de ganancia, aprovechando movimientos mínimos del precio en marcos temporales muy cortos."
+
+    atributos = {
+        "riesgo": "Alto — requiere rápida ejecución y puede ser afectado por spreads y comisiones.",
+        "frecuencia": "Muy alta — muchas operaciones diarias, buscando acumular pequeñas ganancias.",
+        "robustez": "Moderada — depende de la liquidez y baja volatilidad relativa del mercado.",
+        "horizonte": "Muy corto plazo — posiciones abiertas desde segundos hasta minutos.",
+    }   
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['SMA_5'] = sma(df, 5)
@@ -691,7 +766,15 @@ class EstrategiaScalping(EstrategiaBase):
 #MEAN REVERSION: se basa en que el precio vuelve a su media tras alejarse.
 class EstrategiaReversionMedia(EstrategiaBase):
     nombre_interno = "estrategia_reversion_media"
-    operativa = False
+    descripcion = "Comprar cuando el precio se aleja excesivamente a la baja de su media histórica y vender cuando se aleja excesivamente al alza, esperando que vuelva a la media."
+
+    atributos = {
+        "riesgo": "Moderado — puede fallar en tendencias fuertes donde el precio no vuelve rápidamente a la media.",
+        "frecuencia": "Media — señales regulares cuando el precio se desvía significativamente.",
+        "robustez": "Moderada — funciona mejor en mercados laterales o con ciclos claros.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['SMA_20'] = sma(df, 20)
@@ -744,7 +827,15 @@ class EstrategiaReversionMedia(EstrategiaBase):
 #TREND FOLLOWING: detecta tendencias sostenidas basadas en medias de 50 y 200.
 class EstrategiaTendencia(EstrategiaBase):
     nombre_interno = "estrategia_seguimiento_tendencia"
-    operativa = False
+    descripcion = "Comprar en la confirmación de una tendencia alcista y vender en la confirmación de una tendencia bajista, siguiendo la dirección del mercado."
+
+    atributos = {
+        "riesgo": "Moderado — puede experimentar pérdidas durante retrocesos o falsos rompimientos.",
+        "frecuencia": "Baja a media — menos operaciones pero buscando movimientos significativos.",
+        "robustez": "Alta — efectiva en mercados con tendencias claras y sostenidas.",
+        "horizonte": "Medio a largo plazo — posiciones mantenidas desde días hasta semanas o meses.",
+    }   
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['SMA_50'] = sma(df, 50)
@@ -772,7 +863,15 @@ class EstrategiaTendencia(EstrategiaBase):
 #ESTRATEGIA VOLUME: Detecta aumentos inusuales de volumen
 class EstrategiaVolume(EstrategiaBase):
     nombre_interno = "estrategia_volume"
-    operativa = False
+    descripcion = "Operar basado en cambios significativos en el volumen para confirmar movimientos de precio, entrando en rupturas o señales con volumen alto."
+
+    atributos = {
+        "riesgo": "Moderado — puede generar señales falsas si el volumen no es consistente.",
+        "frecuencia": "Media — señales regulares dependiendo de la actividad del mercado.",
+        "robustez": "Moderada — funciona mejor en mercados líquidos y activos con buen volumen.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['Volumen_Medio'] = df['Volume'].rolling(window=20).mean()
@@ -797,7 +896,15 @@ class EstrategiaVolume(EstrategiaBase):
 #ESTRATEGIA PRICE ACTION: Simulación simple basada en velas alcistas/bajistas
 class EstrategiaPriceAction(EstrategiaBase):
     nombre_interno = "estrategia_price_action"
-    operativa = False
+    descripcion = "Analizar patrones y movimientos del precio puro (velas, soportes, resistencias) para tomar decisiones de compra y venta sin depender de indicadores."
+
+    atributos = {
+        "riesgo": "Variable — depende de la experiencia del trader para interpretar correctamente las señales.",
+        "frecuencia": "Variable — desde pocas operaciones al día hasta pocas por semana, según marco temporal y estilo.",
+        "robustez": "Alta — funciona bien en cualquier mercado y marco temporal, al basarse en la estructura del precio.",
+        "horizonte": "Corto a largo plazo — adaptable a scalping, day trading y swing trading.",
+    }   
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
@@ -858,7 +965,15 @@ class EstrategiaPriceAction(EstrategiaBase):
 #ESTRATEGIA SWING TRADING: Mantener posición de pocos días hasta semanas
 class EstrategiaSwingTrading(EstrategiaBase):
     nombre_interno = "estrategia_swing_trading"
-    operativa = False
+    descripcion = "Aprovechar oscilaciones intermedias del mercado, comprando en soportes y vendiendo en resistencias dentro de tendencias o rangos."
+
+    atributos = {
+        "riesgo": "Moderado — expuesto a retrocesos y eventos inesperados durante varios días.",
+        "frecuencia": "Baja a media — pocas operaciones por semana o mes.",
+        "robustez": "Alta — efectiva en mercados con tendencias y ciclos definidos.",
+        "horizonte": "Medio plazo — posiciones mantenidas desde varios días hasta semanas.",
+    }   
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['SMA_10'] = sma(df, 10)
@@ -890,7 +1005,15 @@ class EstrategiaSwingTrading(EstrategiaBase):
 #ESTRATEGIA POSITION TRADING: Mantener largos periodos si hay confirmación técnica
 class EstrategiaPositionTrading(EstrategiaBase):
     nombre_interno = "estrategia_position_trading"
-    operativa = False
+    descripcion = "Mantener posiciones durante semanas o meses, siguiendo tendencias amplias y basándose en análisis técnico y fundamental para capturar movimientos significativos."
+
+    atributos = {
+        "riesgo": "Moderado a bajo — riesgo de grandes retrocesos, pero menor exposición al ruido diario.",
+        "frecuencia": "Muy baja — pocas operaciones al año.",
+        "robustez": "Alta — funciona bien en mercados con tendencias claras y activos sólidos.",
+        "horizonte": "Largo plazo — posiciones mantenidas desde meses hasta años.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         df['SMA_100'] = sma(df, 100)
@@ -940,7 +1063,15 @@ class EstrategiaPositionTrading(EstrategiaBase):
 #ESTRATEGIA ARBITRAGE(SIMULADA): Detecta diferencia de precios entre dos activos
 class EstrategiaArbitrajeSimulado(EstrategiaBase):
     nombre_interno = "estrategia_arbitraje_simulado"
-    operativa = False
+    descripcion = "Detectar y aprovechar diferencias temporales de precio entre dos o más mercados o activos relacionados, simulando la ejecución para evaluar rentabilidad y riesgos."
+
+    atributos = {
+        "riesgo": "Bajo a moderado — riesgo limitado pero expuesto a latencia, slippage y costos de transacción.",
+        "frecuencia": "Muy alta — múltiples oportunidades en cortos períodos.",
+        "robustez": "Alta en simulaciones controladas — en la práctica depende de velocidad y liquidez.",
+        "horizonte": "Ultra corto plazo — operaciones que se abren y cierran en segundos o minutos.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         # Simular la columna 'Close_B' si no existe
@@ -995,7 +1126,15 @@ class EstrategiaArbitrajeSimulado(EstrategiaBase):
 #ESTRATEGIA PAIR TRADING(SIMULADA): Largo en un activo, corto en otro correlacionado
 class EstrategiaPairTrading(EstrategiaBase):
     nombre_interno = "estrategia_pair_trading"
-    operativa = False
+    descripcion = "Comprar un activo infravalorado y vender simultáneamente otro sobrevalorado dentro de un par correlacionado, esperando que la relación vuelva a la media."
+
+    atributos = {
+        "riesgo": "Moderado — riesgo de ruptura prolongada de la correlación entre los activos.",
+        "frecuencia": "Media — señales según desviaciones significativas del spread.",
+        "robustez": "Moderada — funciona mejor con pares altamente correlacionados y cointegrados.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta semanas.",
+    }
+    operativa = True
 
     def aplicar(self, df, metadata=None):
         if 'Close_B' not in df.columns:
