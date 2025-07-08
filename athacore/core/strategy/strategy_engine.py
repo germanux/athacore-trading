@@ -1,5 +1,4 @@
 import pandas as pd
-import os
 import re
 
 from dotenv import load_dotenv
@@ -19,9 +18,6 @@ from athacore.core.data.market_data_yhfinance import get_price_data as get_price
 from athacore.core.data.market_data_alpha_vantage import get_price_data as get_price_data_alpha_vantage
 from athacore.core.data.market_data_finnhub import get_price_data as get_price_data_finnhub
 from athacore.core.data.market_data_twelvedata import get_price_data as get_price_data_twelve
-
-# Reemplaza con tu propia API Key de Twelve Data
-twelve_data_api_key = os.getenv("TWELVE_DATA_API_KEY", "TU_API_KEY_AQUI")
 
 def camel_to_snake(name):
     name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
@@ -53,9 +49,10 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=N
 
     data_sources = [
         ("Yahoo Finance", get_price_data_yhfinance, {"config": config}),
-        #("Finnhub", get_price_data_finnhub, {}),
+        ("Twelve Data", get_price_data_twelve, {"config": config}),
+        ("Finnhub", get_price_data_finnhub, {})                             #Invalid API key
         #("Alpha Vantage", get_price_data_alpha_vantage, {}),
-        #("Twelve Data", get_price_data_twelve, {"bar_size": bar_size, "api_key": twelve_data_api_key})
+        
         
     ]
 
@@ -90,13 +87,13 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=N
               estrategia.config["total_data_needed"])
     
     if df is not None and not df.empty:
-        print("✅ [STRATEGY_ENGINE]: Se descargaróon los datos correctamente")
+        print("✅ [STRATEGY_ENGINE]: Se descargarón los datos correctamente")
         dicc_señales = estrategia.aplicar(df, metadata)
         señales = dicc_señales["señales"]
 
         if señales is None or señales.empty:
             print("⚠️[STRATEGY_ENGINE]: No se creo ninguna señal de compra o venta")
-        print(f"Señales creadas: \n{señales}")
+        print(f"Señales creadas: \n{señales.head()}")
         return dicc_señales
     else:
         print("❌ [STRATEGY_ENGINE]: No se pudieron descargar los datos")

@@ -35,9 +35,7 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_c
 
         dicc_señales = run_analysis(estrategia, ticker, start, end, config=config)
         señales = dicc_señales["señales"]
-        print("SEÑALES AJUFDKWJSBDKJSADKJBASJKDBASJKDBAS")
-        print(señales)
-        resultado, diccionario = run_backtest(señales["señales"], "compra", initial_cash, percentage_cash)
+        resultado, diccionario = run_backtest(señales, "compra", initial_cash, percentage_cash)
 
         status_label.clear()
 

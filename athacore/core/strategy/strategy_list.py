@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 
 from athacore.core.strategy.strategy_base import (EstrategiaBase, generar_senal, sma, rsi, macd, COLUMNAS)
 
+
+"""
+EstrategiaArbitrajeSimulado: Inactiva porque hay que retocarla. Espera una columna Close B que no existe
+"""
+
+
 #ESTRATEGIA PRUEBAS: Genera señales aleatorias. Creado para comprobar funcionamiento independiente de la lógica de la estrategia
 class EstrategiaPruebasRandom(EstrategiaBase):
     nombre_interno = "PRUEBAS: Señales generadas al azar"
@@ -1071,7 +1077,7 @@ class EstrategiaArbitrajeSimulado(EstrategiaBase):
         "robustez": "Alta en simulaciones controladas — en la práctica depende de velocidad y liquidez.",
         "horizonte": "Ultra corto plazo — operaciones que se abren y cierran en segundos o minutos.",
     }
-    operativa = True
+    operativa = False
 
     def aplicar(self, df, metadata=None):
         # Simular la columna 'Close_B' si no existe

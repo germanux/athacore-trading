@@ -1,18 +1,22 @@
 import pandas as pd
 import requests
 from datetime import datetime
+import os
 
+# Reemplaza con tu propia API Key de Twelve Data
+twelve_data_api_key = os.getenv("TWELVE_DATA_API_KEY", "TU_API_KEY_AQUI")
 
-def get_price_data(symbol: str, start_date: str, end_date: str, bar_size: str = "15min", api_key: str = None) -> pd.DataFrame:
-    print(f"[TwelveData DEBUG] Intervalo recibido por función: {bar_size}")
-    print(f"[TwelveData] Solicitando datos para {symbol} de {start_date} a {end_date} con intervalo {bar_size}")
+def get_price_data(symbol: str, start_date: str, end_date: str,  config: dict=None, api_key: str = twelve_data_api_key) -> pd.DataFrame:
+    candle_size = "15min"
+    if config:
+        candle_size = config["candle_size"]
 
-    interval = bar_size.replace("min", "min")  # ya viene como "15min", etc.
+    print(f"MARKET_DATA_TWELVEDATA]: Se pasaron los siguientes parametros. \n CandleSize: {candle_size}")
 
     url = "https://api.twelvedata.com/time_series"
     params = {
         "symbol": symbol,
-        "interval": interval,
+        "interval": candle_size,
         "start_date": start_date,
         "end_date": end_date,
         "apikey": api_key,
@@ -27,8 +31,6 @@ def get_price_data(symbol: str, start_date: str, end_date: str, bar_size: str = 
         raise ValueError(f"No se obtuvieron datos válidos para {symbol} desde Twelve Data.")
 
     df = pd.DataFrame(data["values"])
-
-    # Conversión y renombre de columnas
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.rename(columns={
         "datetime": "Date",
@@ -38,15 +40,34 @@ def get_price_data(symbol: str, start_date: str, end_date: str, bar_size: str = 
         "close": "Close",
         "volume": "Volume"
     })
-    df = df[["Date", "Open", "High", "Low", "Close", "Volume"]]
-    # Convertir todas las columnas numéricas de texto a float
+
+    # Convertir columnas numéricas
     for col in ["Open", "High", "Low", "Close", "Volume"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
-    
+
+    # Eliminar filas con NaNs
     df = df.dropna(subset=["Open", "High", "Low", "Close", "Volume"])
-    df = df.sort_values("Date")
-    df = df.reset_index(drop=True)
 
-    print(f"[TwelveData] Datos recibidos: {len(df)} filas desde la API")
+    # Asegurar tipo int64 para Volume
+    df["Volume"] = df["Volume"].astype("int64")
 
-    return df
+    # Ordenar y reordenar columnas
+    df = df.sort_values("Date").reset_index(drop=True)
+    df = df[["Date", "Close", "High", "Low", "Open", "Volume"]]
+
+    print(f"[MARKET_DATA_TWELVEDATA]: Datos descargados: \n{df.head()}")
+
+    metadata = {
+        "market_data":{
+            "source": "TwelveData",
+            "symbol": symbol,
+            #"name": company_name,
+            #"exchange": info.get('exchange', 'N/A'),
+            #"currency": info.get('currency', 'USD'),
+            #"secType": info.get('quoteType', 'stock'),
+            "start_date": start_date,
+            "end_date": end_date,
+            #"config": config,
+            "df_info": df.info()
+        }}
+    return df, metadata

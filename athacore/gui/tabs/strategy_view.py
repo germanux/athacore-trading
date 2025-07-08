@@ -129,12 +129,13 @@ def render_strategy_view():
                 return
             try:
                 fecha_fin = date.today().isoformat()
-                señales = run_analysis(
+                dicc_señales = run_analysis(
                     strategy_name=estrategia.value,
                     ticker=ticker.value.upper(),
                     start=start.value,
                     end=fecha_fin
                 )
+                señales=dicc_señales["señales"]
                 if señales.empty:
                     output.clear()
                     with output:
