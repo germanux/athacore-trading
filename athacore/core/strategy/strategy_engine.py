@@ -50,8 +50,8 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=N
     data_sources = [
         ("Yahoo Finance", get_price_data_yhfinance, {"config": config}),
         ("Twelve Data", get_price_data_twelve, {"config": config}),
-        ("Finnhub", get_price_data_finnhub, {})                             #Invalid API key
-        #("Alpha Vantage", get_price_data_alpha_vantage, {}),
+        ("Alpha Vantage", get_price_data_alpha_vantage, {"config": config}),    #Le falta candle_size
+        ("Finnhub", get_price_data_finnhub, {"config": config})                 #Invalid API key
         
         
     ]

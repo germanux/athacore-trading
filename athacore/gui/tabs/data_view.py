@@ -10,7 +10,7 @@ def render_data_view():
         ticker_input = ui.input('Símbolo (ej: AAPL)').props('outlined dense').classes('w-full')
         status_label = ui.label().classes('text-sm mt-2 text-red-500')
         resultado_label = ui.label().classes('text-lg font-medium text-green-700 mt-2')
-        table_container = ui.column().classes('mt-4')
+        table_container = ui.column().classes('mt-4 w-full')
 
         async def mostrar_datos():
             status_label.set_text('')
@@ -34,11 +34,12 @@ def render_data_view():
                 )
 
                 # Muestra los últimos datos históricos en tabla
-                ui.table(
-                    columns=[{'name': c, 'label': c.capitalize(), 'field': c} for c in df.columns],
-                    rows=df.tail(10).to_dict('records'),
-                    pagination=10
-                ).classes('w-full').bind_to(table_container)
+                with table_container:
+                    ui.table(
+                        columns=[{'name': c, 'label': c.capitalize(), 'field': c} for c in df.columns],
+                        rows=df.tail(10).to_dict('records'),
+                        pagination=10
+                    ).classes('w-full')
 
             except Exception as e:
                 status_label.set_text(f'❌ Error: {e}')
