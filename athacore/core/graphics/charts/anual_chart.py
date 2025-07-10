@@ -55,7 +55,9 @@ def build_annual_candlestick(ticker, year):
         print(f"Error fetching data for {ticker}: {e}")
         return None
 
+"""
 # Ejemplo en terminal
 chart = build_annual_candlestick('AAPL', '2023')
 if chart:
     print("Chart generated successfully!")
+"""

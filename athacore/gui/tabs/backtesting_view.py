@@ -208,10 +208,10 @@ def render_backtesting_view():
 
             output = ui.column().classes("items-center")
             
-            with ui.column():
+            with ui.column().classes("w-1/4"):
                 errores_output = ui.column().classes("text-red-600 p-2")  # 🔧 NUEVO
 
-                strategy_data = ui.column().classes("w-1/4")
+                strategy_data = ui.column()
                 ui.button(
                     'Ejecutar Backtest',
                     on_click=lambda: ejecutar_backtest(

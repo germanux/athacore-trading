@@ -36,7 +36,7 @@ def get_price_data(symbol: str, start_date: str, end_date: str, config:dict = No
         df['Date'] = pd.to_datetime(df['Date'])
         df['Volume'] = df['Volume'].astype('int64')
 
-        print(f"[MARKET_DATA_YHFINANCE]: Datos descargados: \n{df.head()}")
+        print(f"[MARKET_DATA_ALPHAVANTAGE]: Datos descargados: \n{df.head()}")
 
         metadata = {
         "market_data":{
@@ -55,7 +55,7 @@ def get_price_data(symbol: str, start_date: str, end_date: str, config:dict = No
         return df, metadata
 
     except Exception as e:
-        print(f"[MARKET_DATA_ALPHAVANTAGE]: Error fetching data for {symbol}: {e}")
+        print(f"[MARKET_DATA_ALPHAVANTAGE]: Error fetching datos for {symbol}: {e}")
         return pd.DataFrame()
 
 """
