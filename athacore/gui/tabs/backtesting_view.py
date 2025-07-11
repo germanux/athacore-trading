@@ -222,6 +222,17 @@ def render_backtesting_view():
                         time_filter_start, time_filter_end, slippage_tolerance,
                         errores_output  # 🔧 NUEVO
                     ))
+                
+                async def pruebas_IB():
+                    from athacore.core.data.market_data_IB_Victor import get_price_data
+                    df, metadata = await get_price_data(symbol=ticker.value)
+                    print(f"DF OBTENIDO DE IB\n{df}")
+
+
+                ui.button(
+                    "Backtesting de IBGateway",
+                    on_click=lambda _: pruebas_IB()
+                )
 
             print_default_config(mostrar_estrategias().get(estrategia.value), strategy_data)
             input_type_change(input_type.value, inputs_by_date, inputs_by_candles)
