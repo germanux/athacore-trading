@@ -12,7 +12,7 @@ SYMBOLS_SUPPORTED_OPTIONS = ["AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "NVDA", "M
 
 visibilidad = False
 
-def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_cash, status_label,
+async def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_cash, status_label,
                       candle_size, lookback_period, total_data_needed, execution_frequency,
                       signal_delay, time_filter_start, time_filter_end, slippage_tolerance,
                       errores_output):  # 🔧 NUEVO
@@ -33,7 +33,7 @@ def ejecutar_backtest(estrategia, ticker, start, end, initial_cash, percentage_c
             "symbols_supported": [ticker] if ticker else [],
         }
 
-        dicc_señales = run_analysis(estrategia, ticker, start, end, config=config)
+        dicc_señales = await run_analysis(estrategia, ticker, start, end, config=config)
         señales = dicc_señales["señales"]
         resultado, diccionario = run_backtest(señales, "compra", initial_cash, percentage_cash)
 

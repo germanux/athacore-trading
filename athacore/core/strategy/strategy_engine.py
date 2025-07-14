@@ -1,4 +1,5 @@
 import pandas as pd
+import asyncio
 import re
 
 from dotenv import load_dotenv
@@ -18,6 +19,7 @@ from athacore.core.data.market_data_yhfinance import get_price_data as get_price
 from athacore.core.data.market_data_alpha_vantage import get_price_data as get_price_data_alpha_vantage
 from athacore.core.data.market_data_finnhub import get_price_data as get_price_data_finnhub
 from athacore.core.data.market_data_twelvedata import get_price_data as get_price_data_twelve
+from athacore.core.data.market_data_IB_Victor import get_price_data as get_price_data_IBV
 
 def camel_to_snake(name):
     name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
@@ -34,7 +36,7 @@ def mostrar_estrategias(config=None):
                 estrategias[instancia.nombre_interno] = instancia
     return estrategias
 
-def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=None) -> pd.DataFrame:
+async def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=None) -> pd.DataFrame:
     listado_estrategias = mostrar_estrategias(config)
     estrategia = listado_estrategias.get(strategy_name)
 
@@ -48,6 +50,7 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=N
     print(f"[DEBUG] Intervalo solicitado: {bar_size}")
 
     data_sources = [
+        ("IB Gateway", get_price_data_IBV, {}),
         ("Yahoo Finance", get_price_data_yhfinance, {"config": config}),
         ("Twelve Data", get_price_data_twelve, {"config": config}),
         ("Alpha Vantage", get_price_data_alpha_vantage, {"config": config}),    #Le falta candle_size
@@ -56,11 +59,17 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=N
         
     ]
 
+
     # Bucle para probar las distintas fuentes de datos
     for data_source, market_data_function, extra_kwargs in data_sources:
         try:
             kwargs = {"symbol": ticker, "start_date": start, "end_date": end, **extra_kwargs}
-            result = market_data_function(**kwargs)
+            if asyncio.iscoroutinefunction(market_data_function):
+                result = await market_data_function(**kwargs)
+            else:
+                result = market_data_function(**kwargs)
+
+            #Desempaquetado asegurando un orden.
             if isinstance(result, tuple):
                 df, metadata = result
             elif isinstance(result, pd.DataFrame):
@@ -75,6 +84,7 @@ def run_analysis(strategy_name: str, ticker: str, start: str, end: str, config=N
                 break
         except Exception as e:
             print(f"[STRATEGY_ENGINE]: Error con {data_source}: {e}")
+
 
     # Si no hay datos, intentamos cargar desde CSV local
     if df is None or df.empty:

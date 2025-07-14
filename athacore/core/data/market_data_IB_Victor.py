@@ -4,10 +4,12 @@ from datetime import datetime
 
 async def get_price_data(
     symbol: str,
+    start_date: str = "",           #Parametros incluidos para que no salten error al insertarlos
+    end_date: str = "",
+    duration_str: str = '1 M',
+    end_datetime: str = '',
     exchange: str = 'SMART',
     currency: str = 'USD',
-    end_datetime: str = '',
-    duration_str: str = '1 M',
     bar_size: str = '1 day',
     what_to_show: str = 'TRADES',
     use_rth: bool = True,
@@ -39,17 +41,28 @@ async def get_price_data(
             return pd.DataFrame()
 
         df = util.df(bars)
-        df.set_index('date', inplace=True)
+
+        #Procesado de datos
+        df['Date'] = pd.to_datetime(df['date'])
+        df = df.drop(columns=['date'])
+        df = df[['Date', 'close', 'high', 'low', 'open', 'volume']]
+        df.columns = ['Date', 'Close', 'High', 'Low', 'Open', 'Volume']
+        df['Volume'] = df['Volume'].astype('int64')
+
         metadata = {
         "market_data":{
-            "source": "Alphavantage",
+            "source": "Ib Gateway",
             "symbol": symbol,
             #"name": company_name,
             #"exchange": info.get('exchange', 'N/A'),
             #"currency": info.get('currency', 'USD'),
             #"secType": info.get('quoteType', 'stock'),
+            #"start_date": start_date,
+            "end_date": end_datetime,
+            #"config": config,
             "df_info": df.info()
         }}
+
         print (df)
         return df, metadata
 
