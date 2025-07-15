@@ -53,10 +53,8 @@ async def run_analysis(strategy_name: str, ticker: str, start: str, end: str, co
         ("IB Gateway", get_price_data_IBV, {}),
         ("Yahoo Finance", get_price_data_yhfinance, {"config": config}),
         ("Twelve Data", get_price_data_twelve, {"config": config}),
-        ("Alpha Vantage", get_price_data_alpha_vantage, {"config": config}),    #Le falta candle_size
+        ("Alpha Vantage", get_price_data_alpha_vantage, {"config": config})    #Le falta candle_size
         ("Finnhub", get_price_data_finnhub, {"config": config})                 #Invalid API key
-        
-        
     ]
 
 

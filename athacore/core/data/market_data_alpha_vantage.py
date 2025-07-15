@@ -29,7 +29,9 @@ def get_price_data(symbol: str, start_date: str, end_date: str, config:dict = No
             '4. close': 'Close',
             '5. volume': 'Volume'
         }, inplace=True)
-        df.drop("index", axis=1, inplace=True)
+
+        if 'index' in df.columns:
+            df.drop("index", axis=1, inplace=True)
         df = df[['Date', 'Close', 'High', 'Low', 'Open', 'Volume']]
 
         # Asegurar tipos correctos
