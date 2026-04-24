@@ -1,0 +1,1199 @@
+#=== Imports y Utilidades ===
+import pandas as pd
+import os
+import matplotlib.pyplot as plt
+
+from athacore.core.strategy.strategy_base import (EstrategiaBase, generar_senal, sma, rsi, macd, COLUMNAS)
+
+
+"""
+EstrategiaArbitrajeSimulado: Inactiva porque hay que retocarla. Espera una columna Close B que no existe
+"""
+
+
+#ESTRATEGIA PRUEBAS: Genera señales aleatorias. Creado para comprobar funcionamiento independiente de la lógica de la estrategia
+class EstrategiaPruebasRandom(EstrategiaBase):
+    nombre_interno = "PRUEBAS: Señales generadas al azar"
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        señales = []
+
+        # Generar una compra en la primera fila válida
+        señales.append(generar_senal(df, 0, True))
+
+        for i in range(len(df)):
+        # Generar un número aleatorio y decidir si crear una señal (ajustá la probabilidad)
+            import random
+            if random.random() < 0.5: 
+                señal = random.choice([True, False])  # True = Compra, False = Venta
+                señal_generada = generar_senal(df, i, señal)
+                if señal_generada:
+                    señales.append(señal_generada)
+
+        # Generar una venta en la última fila
+        señales.append(generar_senal(df, len(df) - 1, False))
+
+        """
+        metadata["strategy"]{
+            "nombre": nombre_interno
+        }
+        """
+        return {
+            "df": df,
+            "señales":pd.DataFrame(señales, columns=COLUMNAS),
+            "metadata": metadata}
+
+class EstrategiaCompraVenta(EstrategiaBase):
+    nombre_interno = "PRUEBAS: Señal de compra y venta"
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        señales = []
+        
+        señales.append(generar_senal(df, 0, True))
+        señales.append(generar_senal(df, len(df) - 1, False))
+
+        return {
+            "df": df,
+            "señales":pd.DataFrame(señales, columns=COLUMNAS),
+            "metadata": metadata}
+
+class EstrategiaVentaCompra(EstrategiaBase):
+    nombre_interno = "PRUEBAS ESTRATEGIAS: Última señal de compra"
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        señales = []
+        
+        señales.append(generar_senal(df, len(df) - 1, False))
+        señales.append(generar_senal(df, 0, True))
+
+        return {
+            "df": df,
+            "señales":pd.DataFrame(señales, columns=COLUMNAS),
+            "metadata": metadata}
+
+#ESTRATEGIA BREAKOUT: compra si el precio supera la resistencia reciente
+class EstrategiaBreakout(EstrategiaBase):
+    nombre_interno = "estrategia_breakout"
+    
+    descripcion = ("Compra cuando el precio rompe una resistencia con volumen y vende al romper soporte o alcanzar límites de riesgo.")
+    
+    atributos = {
+        "riesgo": "Alto — puede experimentar movimientos bruscos, adecuado para traders agresivos.",
+        "frecuencia": "Media — genera señales con moderada regularidad, evitando sobreoperar.",
+        "robustez": "Moderada — sensible a mercados muy volátiles o laterales.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas varias horas o días.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        #Parámetros con valores por defecto
+        ventana_breakout = self.config.get("ventana_breakout", 20)
+        take_profit = self.config.get("take_profit", 0.03)
+        stop_loss = self.config.get("stop_loss", 0.01)
+        volumen_window = self.config.get("volumen_window", 20)
+        duracion_maxima = self.config.get("duracion_maxima", 48)
+
+        #Cálculo de indicadores
+        df['max_n'] = df['Close'].rolling(window=ventana_breakout).max()
+        df['min_n'] = df['Close'].rolling(window=ventana_breakout).min()
+        df['SMA_200'] = sma(df, 200)
+        df['Volumen_Medio'] = df['Volume'].rolling(window=volumen_window).mean()
+        df = df.dropna(subset=['max_n', 'min_n', 'SMA_200', 'Volumen_Medio'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+        entrada_index = None
+
+        for i in range(200, len(df)):
+            close = df['Close'].iloc[i]
+            max_prev = df['max_n'].iloc[i - 1]
+            min_prev = df['min_n'].iloc[i - 1]
+            sma200 = df['SMA_200'].iloc[i]
+            volumen = df['Volume'].iloc[i]
+            volumen_medio = df['Volumen_Medio'].iloc[i]
+
+            #Salida por TP/SL o duración máxima
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss) or i - entrada_index >= duracion_maxima:
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    entrada_index = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss) or i - entrada_index >= duracion_maxima:
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    entrada_index = None
+                    continue
+
+            #Entrada en compra si supera el máximo reciente y está por encima de la media
+            if (
+                close > max_prev and
+                close > sma200 and
+                volumen > volumen_medio and
+                posicion_abierta != "compra"
+            ):
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+                entrada_index = i
+
+            #Entrada en venta si cae por debajo del mínimo reciente y debajo de la media
+            elif (
+                close < min_prev and
+                close < sma200 and
+                volumen > volumen_medio and
+                posicion_abierta != "venta"
+            ):
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+                entrada_index = i
+
+        return {
+            "df": df,
+            "señales":pd.DataFrame(señales, columns=COLUMNAS),
+            "metadata": metadata}
+
+#ESTRATEGIA REVERSAL: compra si hay reversión tras caída
+class EstrategiaReversal(EstrategiaBase):
+    nombre_interno = "estrategia_reversal"
+
+    descripcion = "Compra cuando el precio rompe una resistencia con volumen y vende al romper soporte o alcanzar límites de riesgo."
+
+    atributos = {
+        "riesgo": "Alto — puede experimentar movimientos bruscos, adecuado para traders agresivos.",
+        "frecuencia": "Media — genera señales con moderada regularidad, evitando sobreoperar.",
+        "robustez": "Moderada — sensible a mercados muy volátiles o laterales.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas varias horas o días.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
+        df['SMA_200'] = sma(df, 200)
+        df = df.dropna(subset=['RSI', 'SMA_200'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        take_profit = self.config.get("take_profit", 0.015)
+        stop_loss = self.config.get("stop_loss", 0.005)
+
+        for i in range(2, len(df)):
+            close = df['Close'].iloc[i]
+            open_ = df['Open'].iloc[i]
+            close_prev = df['Close'].iloc[i - 1]
+            open_prev = df['Open'].iloc[i - 1]
+            rsi_val = df['RSI'].iloc[i]
+            sma200 = df['SMA_200'].iloc[i]
+
+            #Cierre por TP o SL
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            #ENTRADA COMPRA 
+            cuerpo_anterior = abs(close_prev - open_prev)
+            cuerpo_actual = abs(close - open_)
+            if (
+                rsi_val < 30 and
+                close > open_ and
+                open_prev > close_prev and
+                cuerpo_actual > cuerpo_anterior and
+                close > sma200 and  #<- Solo si tendencia general es alcista
+                posicion_abierta != "compra"
+            ):
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            #ENTRADA VENTA 
+            elif (
+                rsi_val > 70 and
+                close < open_ and
+                open_prev < close_prev and
+                cuerpo_actual > cuerpo_anterior and
+                close < sma200 and  #<- Solo si tendencia general es bajista
+                posicion_abierta != "venta"
+            ):
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA RANGE TRADING
+class EstrategiaRango(EstrategiaBase):
+    nombre_interno = "estrategia_rango"
+
+    descripcion = "Compra en soporte y vende en resistencia dentro de un rango lateral, aprovechando rebotes hasta que el precio rompa el rango."
+
+    atributos = {
+        "riesgo": "Moderado — riesgo de rupturas falsas y movimientos bruscos fuera del rango.",
+        "frecuencia": "Alta — múltiples oportunidades en mercados laterales o con poca tendencia.",
+        "robustez": "Moderada — menos efectiva en mercados con tendencias fuertes o alta volatilidad.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde minutos hasta varios días.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['min_10'] = df['Close'].rolling(window=10).min()
+        df['max_10'] = df['Close'].rolling(window=10).max()
+        df['SMA_200'] = sma(df, 200)
+        df = df.dropna(subset=['min_10', 'max_10', 'SMA_200'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        take_profit = self.config.get("take_profit", 0.01)
+        stop_loss = self.config.get("stop_loss", 0.005)
+
+        for i in range(10, len(df)):
+            close = df['Close'].iloc[i]
+            sma200 = df['SMA_200'].iloc[i]
+
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            if df['Close'].iloc[i] <= df['min_10'].iloc[i] and close > sma200 and posicion_abierta != "compra":
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+            elif df['Close'].iloc[i] >= df['max_10'].iloc[i] and close < sma200 and posicion_abierta != "venta":
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA DAY TRADING: entradas rápidas, busca variaciones intradía
+class EstrategiaDayTrading(EstrategiaBase):
+    nombre_interno = "estrategia_day_trading"
+
+    descripcion = "Operar comprando y vendiendo dentro del mismo día, aprovechando movimientos intradía y evitando mantener posiciones abiertas de un día para otro."
+
+    atributos = {
+        "riesgo": "Alto — expuesto a volatilidad intradía y movimientos rápidos.",
+        "frecuencia": "Alta — múltiples operaciones diarias, requiere atención constante.",
+        "robustez": "Moderada — depende de buena ejecución y control emocional.",
+        "horizonte": "Muy corto plazo — posiciones abiertas desde segundos hasta horas dentro del mismo día.",
+    }   
+    operativa = True
+
+
+    def aplicar(self, df, metadata=None):
+        lookback = self.config.get("lookback_period", 4)
+        if lookback < 3:
+            lookback = 3
+            self.config["lookback_period"] = 3
+
+        sma_largo = lookback * 4
+        volumen_window = 20
+        total_minimo = sma_largo + volumen_window
+
+        if len(df) < total_minimo:
+            print(f"❌ [DayTrading] Datos insuficientes: se requieren al menos {total_minimo} filas.")
+            return pd.DataFrame(columns=COLUMNAS)
+
+        # Identificar columna de volumen
+        if 'Volume' in df.columns:
+            col_volumen = 'Volume'
+        elif 'Vol.' in df.columns:
+            col_volumen = 'Vol.'
+        else:
+            raise ValueError("❌ El DataFrame no tiene la columna 'Volume' o 'Vol.' de volumen.")
+
+        # Verificar índice de tiempo
+        if not isinstance(df.index, pd.DatetimeIndex):
+            if 'Datetime' in df.columns:
+                df['Datetime'] = pd.to_datetime(df['Datetime'], errors='coerce')
+                df = df.dropna(subset=['Datetime'])
+                df.set_index('Datetime', inplace=True)
+            elif 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                df = df.dropna(subset=['Date'])
+                df.set_index('Date', inplace=True)
+            else:
+                raise ValueError("❌ El DataFrame no tiene la columna 'Date' o 'Datetime' necesaria para usar como índice.")
+
+        df['SMA_corta'] = sma(df, lookback)
+        df['SMA_larga'] = sma(df, sma_largo)
+        df['Volumen_Medio'] = df[col_volumen].rolling(window=volumen_window).mean()
+        df['Hora'] = df.index.strftime('%H:%M')
+        df = df.dropna(subset=['SMA_corta', 'SMA_larga', 'Volumen_Medio'])
+
+        take_profit = self.config.get("take_profit", 0.02)
+        stop_loss = self.config.get("stop_loss", 0.005)
+        hora_inicio = self.config.get("hora_inicio", "09:30")
+        hora_fin = self.config.get("hora_fin", "16:00")
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+        entrada_index = None
+
+        for i in range(sma_largo, len(df)):
+            hora_actual = df['Hora'].iloc[i]
+            close = df['Close'].iloc[i]
+            volumen = df[col_volumen].iloc[i]
+            volumen_medio = df['Volumen_Medio'].iloc[i]
+            sma_corta = df['SMA_corta'].iloc[i]
+            sma_larga = df['SMA_larga'].iloc[i]
+
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss) or i - entrada_index >= 36:
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss) or i - entrada_index >= 36:
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    continue
+
+            if not (hora_inicio <= hora_actual <= hora_fin):
+                continue
+
+            if sma_corta > sma_larga * 0.99 and close > sma_corta * 0.99 and volumen > volumen_medio * 0.9 and posicion_abierta != "compra":
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+                entrada_index = i
+
+            elif close < sma_corta * 0.995 and posicion_abierta != "venta":
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+                entrada_index = i
+
+        if not señales:
+            print("⚠️ No se generaron señales con los datos seleccionados.")
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+                
+#ESTRATEGIA NEWS TRADING (SIMULADA): reacción a velas con gran volumen y rango
+class EstrategiaNewsTrading(EstrategiaBase):
+    nombre_interno = "estrategia_news_trading"
+
+    descripcion = "Operar basado en la reacción rápida a noticias económicas o eventos que impactan el mercado, aprovechando la volatilidad inmediata."
+
+    atributos = {
+        "riesgo": "Alto — movimientos impredecibles y volátiles, requiere gestión estricta.",
+        "frecuencia": "Variable — depende del calendario económico y eventos relevantes.",
+        "robustez": "Baja a moderada — puede ser afectada por rumores o noticias inesperadas.",
+        "horizonte": "Muy corto a corto plazo — desde segundos hasta horas después del evento.",
+    }
+    operativa = True
+
+
+    def aplicar(self, df, metadata=None):
+        df['rango'] = df['Close'].pct_change().abs()
+        df['volumen_relativo'] = df['Volume'] / df['Volume'].rolling(20).mean()
+        df['SMA_10'] = sma(df, 10)
+        df = df.dropna(subset=['rango', 'volumen_relativo', 'SMA_10'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        take_profit = self.config.get("take_profit", 0.01)
+        stop_loss = self.config.get("stop_loss", 0.005)
+
+        for i in range(20, len(df)):
+            close = df['Close'].iloc[i]
+            sma10 = df['SMA_10'].iloc[i]
+            rango = df['rango'].iloc[i]
+            vol_rel = df['volumen_relativo'].iloc[i]
+
+            #Cierre por TP o SL
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            #Entrada (compra): evento + fuerza + tendencia alcista
+            if rango > 0.03 and vol_rel > 2 and close > sma10 and posicion_abierta != "compra":
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            #Entrada (venta): calma + debilidad + tendencia bajista
+            elif rango < 0.01 and vol_rel < 1 and close < sma10 and posicion_abierta != "venta":
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA RSI SIMPLE: puntos de sobrecompra y sobreventa.
+class EstrategiaRSI(EstrategiaBase):
+    nombre_interno = "estrategia_rsi_simple"
+    descripcion = "Comprar cuando el RSI indica sobreventa (por ejemplo, <30) y vender cuando indica sobrecompra (por ejemplo, >70), aprovechando reversiones de corto plazo."
+
+    atributos = {
+        "riesgo": "Moderado — puede generar señales falsas en mercados con tendencia fuerte.",
+        "frecuencia": "Media — señales regulares según los niveles de sobrecompra y sobreventa.",
+        "robustez": "Moderada — funciona mejor en mercados laterales o con oscilaciones claras.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
+        df['SMA_200'] = sma(df, 200)
+        df['Volumen_Medio'] = df['Volume'].rolling(window=20).mean()
+        df = df.dropna(subset=['RSI', 'SMA_200', 'Volumen_Medio'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        take_profit = self.config.get("take_profit", 0.015)
+        stop_loss = self.config.get("stop_loss", 0.005)
+
+        for i in range(1, len(df)):
+            close = df['Close'].iloc[i]
+            rsi_val = df['RSI'].iloc[i]
+            sma200 = df['SMA_200'].iloc[i]
+            volumen = df['Volume'].iloc[i]
+            volumen_medio = df['Volumen_Medio'].iloc[i]
+
+            #Cierre por TP o SL
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            #Compra solo si RSI < 25, volumen alto y tendencia positiva
+            if (
+                rsi_val < 25 and close > sma200 and volumen > volumen_medio
+                and posicion_abierta != "compra"
+            ):
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            #Venta solo si RSI > 75, volumen alto y tendencia negativa
+            elif (
+                rsi_val > 75 and close < sma200 and volumen > volumen_medio
+                and posicion_abierta != "venta"
+            ):
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA MACD: cruce de líneas MACD y señal.
+class EstrategiaMACD(EstrategiaBase):
+    nombre_interno = "estrategia_macd_cruce"
+    descripcion = "Comprar cuando la línea MACD cruza por encima de la línea de señal y vender cuando cruza por debajo, identificando cambios en el momentum."
+
+    atributos = {
+        "riesgo": "Moderado — puede generar señales tardías en mercados muy volátiles.",
+        "frecuencia": "Media — ofrece señales regulares, pero no en exceso.",
+        "robustez": "Moderada — funciona bien en tendencias claras, menos efectivo en mercados laterales.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
+    
+    def aplicar(self, df, metadata=None):
+        macd_df = macd(df)
+        df['macd_line'] = macd_df['macd_line']
+        df['signal_line'] = macd_df['signal_line']
+        señales = []
+        for i in range(1, len(df)):
+            if df['macd_line'].iloc[i] > df['signal_line'].iloc[i] and df['macd_line'].iloc[i - 1] <= df['signal_line'].iloc[i - 1]:
+                señales.append(generar_senal(df, i, True))
+            elif df['macd_line'].iloc[i] < df['signal_line'].iloc[i] and df['macd_line'].iloc[i - 1] >= df['signal_line'].iloc[i - 1]:
+                señales.append(generar_senal(df, i, False))
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA BÁSICA DE MEDIAS: cruce de medias móviles simples.
+class EstrategiaMediasSimples(EstrategiaBase):
+    nombre_interno = "estrategia_basica_medias"
+    descripcion = "Comprar cuando la media móvil rápida cruza por encima de la media móvil lenta y vender cuando cruza por debajo, siguiendo la tendencia del mercado."
+
+    atributos = {
+        "riesgo": "Moderado — puede producir señales falsas en mercados laterales.",
+        "frecuencia": "Media — señales regulares basadas en cruces de medias.",
+        "robustez": "Moderada — efectiva en tendencias definidas, menos en rangos.",
+        "horizonte": "Medio plazo — posiciones mantenidas desde días hasta semanas.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['SMA_short'] = sma(df, 5)
+        df['SMA_long'] = sma(df, 20)
+        df['Volumen_Prom'] = df['Volume'].rolling(10).mean()
+        df = df.dropna(subset=['SMA_short', 'SMA_long', 'Volumen_Prom'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        take_profit = self.config.get("take_profit", 0.02)
+        stop_loss = self.config.get("stop_loss", 0.01)
+
+        for i in range(1, len(df)):
+            sma_short = df['SMA_short'].iloc[i]
+            sma_long = df['SMA_long'].iloc[i]
+            sma_short_prev = df['SMA_short'].iloc[i - 1]
+            sma_long_prev = df['SMA_long'].iloc[i - 1]
+            close = df['Close'].iloc[i]
+            volumen_actual = df['Volume'].iloc[i]
+            volumen_prom = df['Volumen_Prom'].iloc[i]
+
+            #Filtro de volumen
+            if volumen_actual < volumen_prom:
+                continue
+
+            #Filtro de pendiente de SMA larga (tendencia)
+            if sma_long < df['SMA_long'].iloc[i - 5]:
+                continue
+
+            #Cierre por TP / SL
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            #Entrada por cruce
+            cruzó_al_alza = sma_short > sma_long and sma_short_prev <= sma_long_prev
+            cruzó_a_la_baja = sma_short < sma_long and sma_short_prev >= sma_long_prev
+
+            if cruzó_al_alza and posicion_abierta != "compra":
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            elif cruzó_a_la_baja and posicion_abierta != "venta":
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#MOMENTUM: fuerza de precio y volumen como señales de entrada y salida.
+class EstrategiaMomentum(EstrategiaBase):
+    nombre_interno = "estrategia_momentum"
+    descripcion = "Comprar cuando el momentum (velocidad del movimiento del precio) es fuerte y positivo, y vender cuando muestra debilidad o reversión, aprovechando la continuidad de la tendencia."
+
+    atributos = {
+        "riesgo": "Moderado — puede generar señales falsas en cambios abruptos o mercados laterales.",
+        "frecuencia": "Media — señales con frecuencia moderada basadas en la fuerza del movimiento.",
+        "robustez": "Moderada — funciona mejor en mercados con tendencias claras.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['SMA_20'] = sma(df, 20)
+        df['SMA_50'] = sma(df, 50)
+        df['SMA_200'] = sma(df, 200)
+        df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
+        df['Volumen_Medio'] = df['Volume'].rolling(window=20).mean()
+
+        df = df.dropna(subset=['SMA_20', 'SMA_50', 'SMA_200', 'RSI', 'Volumen_Medio'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        take_profit = self.config.get("take_profit", 0.01)
+        stop_loss = self.config.get("stop_loss", 0.005)
+
+        for i in range(1, len(df)):
+            close = df['Close'].iloc[i]
+            sma20 = df['SMA_20'].iloc[i]
+            sma50 = df['SMA_50'].iloc[i]
+            sma200 = df['SMA_200'].iloc[i]
+            rsi_val = df['RSI'].iloc[i]
+            volumen = df['Volume'].iloc[i]
+            volumen_medio = df['Volumen_Medio'].iloc[i]
+
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+            if (
+                close > sma20 and close > sma50 and sma50 > sma200 and rsi_val > 55 and volumen > volumen_medio
+                and posicion_abierta != "compra"
+            ):
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            elif (
+                close < sma20 and close < sma50 and sma50 < sma200 and rsi_val < 45
+                and posicion_abierta != "venta"
+            ):
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#SCALPING: entradas y salidas rápidas basadas en cruce de media muy corta.
+class EstrategiaScalping(EstrategiaBase):
+    nombre_interno = "estrategia_scalping"
+    descripcion = "Realizar múltiples operaciones rápidas con pequeños objetivos de ganancia, aprovechando movimientos mínimos del precio en marcos temporales muy cortos."
+
+    atributos = {
+        "riesgo": "Alto — requiere rápida ejecución y puede ser afectado por spreads y comisiones.",
+        "frecuencia": "Muy alta — muchas operaciones diarias, buscando acumular pequeñas ganancias.",
+        "robustez": "Moderada — depende de la liquidez y baja volatilidad relativa del mercado.",
+        "horizonte": "Muy corto plazo — posiciones abiertas desde segundos hasta minutos.",
+    }   
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['SMA_5'] = sma(df, 5)
+        df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
+        df['Volumen_Medio'] = df['Volume'].rolling(window=20).mean()
+        df = df.dropna(subset=['SMA_5', 'RSI', 'Volumen_Medio'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        #Parámetros de TP/SL como porcentaje
+        take_profit = self.config.get("take_profit", 0.01)  
+        stop_loss = self.config.get("stop_loss", 0.005)      
+
+        for i in range(1, len(df)):
+            close = df['Close'].iloc[i]
+            close_prev = df['Close'].iloc[i - 1]
+            sma5 = df['SMA_5'].iloc[i]
+            sma5_prev = df['SMA_5'].iloc[i - 1]
+            rsi_val = df['RSI'].iloc[i]
+            volumen = df['Volume'].iloc[i]
+            volumen_medio = df['Volumen_Medio'].iloc[i]
+
+            #Control de cierre por TP o SL
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            #Señal de entrada (compra)
+            if (close > sma5 and close_prev <= sma5_prev and rsi_val < 30 and
+                    volumen > volumen_medio and posicion_abierta != "compra"):
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            #Señal de entrada (venta)
+            elif (close < sma5 and close_prev >= sma5_prev and rsi_val > 70 and
+                    volumen > volumen_medio and posicion_abierta != "venta"):
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#MEAN REVERSION: se basa en que el precio vuelve a su media tras alejarse.
+class EstrategiaReversionMedia(EstrategiaBase):
+    nombre_interno = "estrategia_reversion_media"
+    descripcion = "Comprar cuando el precio se aleja excesivamente a la baja de su media histórica y vender cuando se aleja excesivamente al alza, esperando que vuelva a la media."
+
+    atributos = {
+        "riesgo": "Moderado — puede fallar en tendencias fuertes donde el precio no vuelve rápidamente a la media.",
+        "frecuencia": "Media — señales regulares cuando el precio se desvía significativamente.",
+        "robustez": "Moderada — funciona mejor en mercados laterales o con ciclos claros.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['SMA_20'] = sma(df, 20)
+        df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
+        df = df.dropna(subset=['SMA_20', 'RSI'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        #Configuración
+        take_profit = self.config.get("take_profit", 0.01)
+        stop_loss = self.config.get("stop_loss", 0.005)  
+
+        for i in range(1, len(df)):
+            close = df['Close'].iloc[i]
+            sma20 = df['SMA_20'].iloc[i]
+            rsi_val = df['RSI'].iloc[i]
+
+            #Cierre de posición por TP o SL
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))  #<- Vender para cerrar compra
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))  #<- Comprar para cerrar venta
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            #Señales de entrada 
+            #COMPRA: muy por debajo de la media y en sobreventa
+            if (close < sma20 * 0.97 and rsi_val < 30 and posicion_abierta != "compra"):
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            #VENTA: muy por encima de la media y en sobrecompra
+            elif (close > sma20 * 1.03 and rsi_val > 70 and posicion_abierta != "venta"):
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#TREND FOLLOWING: detecta tendencias sostenidas basadas en medias de 50 y 200.
+class EstrategiaTendencia(EstrategiaBase):
+    nombre_interno = "estrategia_seguimiento_tendencia"
+    descripcion = "Comprar en la confirmación de una tendencia alcista y vender en la confirmación de una tendencia bajista, siguiendo la dirección del mercado."
+
+    atributos = {
+        "riesgo": "Moderado — puede experimentar pérdidas durante retrocesos o falsos rompimientos.",
+        "frecuencia": "Baja a media — menos operaciones pero buscando movimientos significativos.",
+        "robustez": "Alta — efectiva en mercados con tendencias claras y sostenidas.",
+        "horizonte": "Medio a largo plazo — posiciones mantenidas desde días hasta semanas o meses.",
+    }   
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['SMA_50'] = sma(df, 50)
+        df['SMA_200'] = sma(df, 200)
+        señales = []
+        posicion_abierta = None
+
+        for i in range(1, len(df)):
+            close = df['Close'].iloc[i]
+            sma50 = df['SMA_50'].iloc[i]
+            sma200 = df['SMA_200'].iloc[i]
+
+            if close > sma50 and close > sma200:
+                if posicion_abierta != "compra":
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = "compra"
+
+            elif close < sma50 and close < sma200:
+                if posicion_abierta != "venta":
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = "venta"
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA VOLUME: Detecta aumentos inusuales de volumen
+class EstrategiaVolume(EstrategiaBase):
+    nombre_interno = "estrategia_volume"
+    descripcion = "Operar basado en cambios significativos en el volumen para confirmar movimientos de precio, entrando en rupturas o señales con volumen alto."
+
+    atributos = {
+        "riesgo": "Moderado — puede generar señales falsas si el volumen no es consistente.",
+        "frecuencia": "Media — señales regulares dependiendo de la actividad del mercado.",
+        "robustez": "Moderada — funciona mejor en mercados líquidos y activos con buen volumen.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta días.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['Volumen_Medio'] = df['Volume'].rolling(window=20).mean()
+        df = df.dropna(subset=['Volumen_Medio'])
+        señales = []
+        posicion_abierta = None
+
+        for i in range(1, len(df)):
+            volumen_actual = df['Volume'].iloc[i]
+            volumen_medio = df['Volumen_Medio'].iloc[i]
+
+            if volumen_actual > 1.5 * volumen_medio and posicion_abierta != "compra":
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+
+            elif volumen_actual < 0.5 * volumen_medio and posicion_abierta != "venta":
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA PRICE ACTION: Simulación simple basada en velas alcistas/bajistas
+class EstrategiaPriceAction(EstrategiaBase):
+    nombre_interno = "estrategia_price_action"
+    descripcion = "Analizar patrones y movimientos del precio puro (velas, soportes, resistencias) para tomar decisiones de compra y venta sin depender de indicadores."
+
+    atributos = {
+        "riesgo": "Variable — depende de la experiencia del trader para interpretar correctamente las señales.",
+        "frecuencia": "Variable — desde pocas operaciones al día hasta pocas por semana, según marco temporal y estilo.",
+        "robustez": "Alta — funciona bien en cualquier mercado y marco temporal, al basarse en la estructura del precio.",
+        "horizonte": "Corto a largo plazo — adaptable a scalping, day trading y swing trading.",
+    }   
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['RSI'] = rsi(df, window=self.config.get("lookback_period", 14))
+        df['SMA_50'] = sma(df, 50)
+        df['SMA_200'] = sma(df, 200)
+        df = df.dropna(subset=['RSI', 'SMA_50', 'SMA_200'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        #Configuración de TP/SL
+        take_profit = self.config.get("take_profit", 0.015)
+        stop_loss = self.config.get("stop_loss", 0.005)
+
+        for i in range(1, len(df)):
+            close = df['Close'].iloc[i]
+            open_ = df['Open'].iloc[i]
+            close_prev = df['Close'].iloc[i - 1]
+            open_prev = df['Open'].iloc[i - 1]
+            rsi_val = df['RSI'].iloc[i]
+            sma50 = df['SMA_50'].iloc[i]
+            sma200 = df['SMA_200'].iloc[i]
+
+            #Cierre de posición por TP o SL
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            #Vela alcista tras bajista + tendencia alcista + RSI bajo
+            if (close > open_ and close_prev < open_prev and
+                close > sma50 > sma200 and rsi_val < 30 and
+                posicion_abierta != "compra"):
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            #Vela bajista tras alcista + tendencia bajista + RSI alto
+            elif (close < open_ and close_prev > open_prev and
+                  close < sma50 < sma200 and rsi_val > 70 and
+                  posicion_abierta != "venta"):
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA SWING TRADING: Mantener posición de pocos días hasta semanas
+class EstrategiaSwingTrading(EstrategiaBase):
+    nombre_interno = "estrategia_swing_trading"
+    descripcion = "Aprovechar oscilaciones intermedias del mercado, comprando en soportes y vendiendo en resistencias dentro de tendencias o rangos."
+
+    atributos = {
+        "riesgo": "Moderado — expuesto a retrocesos y eventos inesperados durante varios días.",
+        "frecuencia": "Baja a media — pocas operaciones por semana o mes.",
+        "robustez": "Alta — efectiva en mercados con tendencias y ciclos definidos.",
+        "horizonte": "Medio plazo — posiciones mantenidas desde varios días hasta semanas.",
+    }   
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['SMA_10'] = sma(df, 10)
+        df['SMA_30'] = sma(df, 30)
+        df = df.dropna(subset=['SMA_10', 'SMA_30'])
+
+        señales = []
+        posicion_abierta = None
+
+        for i in range(1, len(df)):
+            sma10_actual = df['SMA_10'].iloc[i]
+            sma30_actual = df['SMA_30'].iloc[i]
+            sma10_prev = df['SMA_10'].iloc[i - 1]
+            sma30_prev = df['SMA_30'].iloc[i - 1]
+
+            cruzó_al_alza = sma10_actual > sma30_actual and sma10_prev <= sma30_prev
+            cruzó_a_la_baja = sma10_actual < sma30_actual and sma10_prev >= sma30_prev
+
+            if cruzó_al_alza and posicion_abierta != "compra":
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+
+            elif cruzó_a_la_baja and posicion_abierta != "venta":
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA POSITION TRADING: Mantener largos periodos si hay confirmación técnica
+class EstrategiaPositionTrading(EstrategiaBase):
+    nombre_interno = "estrategia_position_trading"
+    descripcion = "Mantener posiciones durante semanas o meses, siguiendo tendencias amplias y basándose en análisis técnico y fundamental para capturar movimientos significativos."
+
+    atributos = {
+        "riesgo": "Moderado a bajo — riesgo de grandes retrocesos, pero menor exposición al ruido diario.",
+        "frecuencia": "Muy baja — pocas operaciones al año.",
+        "robustez": "Alta — funciona bien en mercados con tendencias claras y activos sólidos.",
+        "horizonte": "Largo plazo — posiciones mantenidas desde meses hasta años.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        df['SMA_100'] = sma(df, 100)
+        df['SMA_200'] = sma(df, 200)
+        df = df.dropna(subset=['SMA_100', 'SMA_200'])
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+
+        take_profit = self.config.get("take_profit", 0.05)
+        stop_loss = self.config.get("stop_loss", 0.03)
+
+        for i in range(1, len(df)):
+            close = df['Close'].iloc[i]
+            sma100 = df['SMA_100'].iloc[i]
+            sma200 = df['SMA_200'].iloc[i]
+
+            #Cierre por TP o SL
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    continue
+
+            #Entrada en compra
+            if close > sma100 and close > sma200 and posicion_abierta != "compra":
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+
+            #Entrada en venta
+            elif close < sma100 and close < sma200 and posicion_abierta != "venta":
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA ARBITRAGE(SIMULADA): Detecta diferencia de precios entre dos activos
+class EstrategiaArbitrajeSimulado(EstrategiaBase):
+    nombre_interno = "estrategia_arbitraje_simulado"
+    descripcion = "Detectar y aprovechar diferencias temporales de precio entre dos o más mercados o activos relacionados, simulando la ejecución para evaluar rentabilidad y riesgos."
+
+    atributos = {
+        "riesgo": "Bajo a moderado — riesgo limitado pero expuesto a latencia, slippage y costos de transacción.",
+        "frecuencia": "Muy alta — múltiples oportunidades en cortos períodos.",
+        "robustez": "Alta en simulaciones controladas — en la práctica depende de velocidad y liquidez.",
+        "horizonte": "Ultra corto plazo — operaciones que se abren y cierran en segundos o minutos.",
+    }
+    operativa = False
+
+    def aplicar(self, df, metadata=None):
+        # Simular la columna 'Close_B' si no existe
+        if 'Close_B' not in df.columns:
+            print("⚠️ Simulando columna 'Close_B' para pruebas.")
+            df['Close_B'] = df['Close'].shift(1) * (1 + 0.001)  #<-Cambio pequeño
+
+        # Calcular diferencia y estadísticas
+        df['diff'] = df['Close'] - df['Close_B']
+        df['media'] = df['diff'].rolling(10).mean()
+        df['std'] = df['diff'].rolling(10).std()
+        df = df.dropna(subset=['media', 'std'])
+
+        señales = []
+        posicion_abierta = None
+        entrada_index = None
+        precio_entrada = None
+
+        take_profit = self.config.get("take_profit", 0.01)
+        stop_loss = self.config.get("stop_loss", 0.005)
+
+        for i in range(10, len(df)):
+            diff = df['diff'].iloc[i]
+            media = df['media'].iloc[i]
+            std = df['std'].iloc[i]
+            close = df['Close'].iloc[i]
+
+            # Cierre por take profit o stop loss
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    entrada_index = None
+                    precio_entrada = None
+                    continue
+
+            # Entrada por arbitraje simulado
+            if posicion_abierta is None:
+                if diff < media - std:
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = "compra"
+                    entrada_index = i
+                    precio_entrada = close
+                elif diff > media + std:
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = "venta"
+                    entrada_index = i
+                    precio_entrada = close
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
+
+#ESTRATEGIA PAIR TRADING(SIMULADA): Largo en un activo, corto en otro correlacionado
+class EstrategiaPairTrading(EstrategiaBase):
+    nombre_interno = "estrategia_pair_trading"
+    descripcion = "Comprar un activo infravalorado y vender simultáneamente otro sobrevalorado dentro de un par correlacionado, esperando que la relación vuelva a la media."
+
+    atributos = {
+        "riesgo": "Moderado — riesgo de ruptura prolongada de la correlación entre los activos.",
+        "frecuencia": "Media — señales según desviaciones significativas del spread.",
+        "robustez": "Moderada — funciona mejor con pares altamente correlacionados y cointegrados.",
+        "horizonte": "Corto a medio plazo — posiciones mantenidas desde horas hasta semanas.",
+    }
+    operativa = True
+
+    def aplicar(self, df, metadata=None):
+        if 'Close_B' not in df.columns:
+            print("⚠️ Pair Trading requiere columna 'Close_B'. Simulando con Close desplazado.")
+            df['Close_B'] = df['Close'].shift(1) * (1 + 0.001)
+
+        df['spread'] = df['Close'] - df['Close_B']
+        df['media'] = df['spread'].rolling(15).mean()
+        df['std'] = df['spread'].rolling(15).std()
+        df = df.dropna(subset=['media', 'std'])
+
+        take_profit = self.config.get("take_profit", 0.015)
+        stop_loss = self.config.get("stop_loss", 0.007)
+
+        señales = []
+        posicion_abierta = None
+        precio_entrada = None
+        entrada_index = None
+
+        for i in range(15, len(df)):
+            spread = df['spread'].iloc[i]
+            media = df['media'].iloc[i]
+            std = df['std'].iloc[i]
+            close = df['Close'].iloc[i]
+
+            # Salida
+            if posicion_abierta == "compra":
+                if close >= precio_entrada * (1 + take_profit) or close <= precio_entrada * (1 - stop_loss):
+                    señales.append(generar_senal(df, i, False))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    entrada_index = None
+                    continue
+
+            elif posicion_abierta == "venta":
+                if close <= precio_entrada * (1 - take_profit) or close >= precio_entrada * (1 + stop_loss):
+                    señales.append(generar_senal(df, i, True))
+                    posicion_abierta = None
+                    precio_entrada = None
+                    entrada_index = None
+                    continue
+
+            # Entrada
+            if spread < media - 1.5 * std and posicion_abierta != "compra":
+                señales.append(generar_senal(df, i, True))
+                posicion_abierta = "compra"
+                precio_entrada = close
+                entrada_index = i
+
+            elif spread > media + 1.5 * std and posicion_abierta != "venta":
+                señales.append(generar_senal(df, i, False))
+                posicion_abierta = "venta"
+                precio_entrada = close
+                entrada_index = i
+
+        return pd.DataFrame(señales, columns=COLUMNAS)
